@@ -6,7 +6,7 @@ import { useState } from 'react';
 function App() {
     const [currentUser, setCurrentUser] = useState(null);
     return (
-        <Router>
+        <Router basename="/Challengelt">
             <div className="App">
                 <Routes>
                     {publicRoutes.map((route, index) => {
