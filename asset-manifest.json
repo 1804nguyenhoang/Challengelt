@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/challengelt/static/css/main.d9af8789.css",
+    "main.js": "/challengelt/static/js/main.a8242001.js",
+    "static/js/488.44297539.chunk.js": "/challengelt/static/js/488.44297539.chunk.js",
+    "static/media/logoweb.png": "/challengelt/static/media/logoweb.d7c2a47acbf3df4c69e4.png",
+    "index.html": "/challengelt/index.html",
+    "main.d9af8789.css.map": "/challengelt/static/css/main.d9af8789.css.map",
+    "main.a8242001.js.map": "/challengelt/static/js/main.a8242001.js.map",
+    "488.44297539.chunk.js.map": "/challengelt/static/js/488.44297539.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.d9af8789.css",
+    "static/js/main.a8242001.js"
+  ]
+}
