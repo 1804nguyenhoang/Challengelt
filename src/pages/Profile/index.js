@@ -1,6 +1,19 @@
 'use client';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { databases, storage, account, Query, ID, DATABASE_ID, USERS_ID, CHALLENGES_ID, JOINED_CHALLENGES_ID, DEFAULT_IMG, BUCKET_ID, NOTIFICATIONS_ID } from '~/appwrite/config';
+import {
+    databases,
+    storage,
+    account,
+    Query,
+    ID,
+    DATABASE_ID,
+    USERS_ID,
+    CHALLENGES_ID,
+    JOINED_CHALLENGES_ID,
+    DEFAULT_IMG,
+    BUCKET_ID,
+    NOTIFICATIONS_ID,
+} from '~/appwrite/config';
 import { UserContext } from '~/contexts/UserContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -8,7 +21,7 @@ import { faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import Tippy from '@tippyjs/react';
-import 'tippy.js/dist/tippy.css'; // optional
+import 'tippy.js/dist/tippy.css';
 
 const Profile = () => {
     const { userId, setUserId, displayName } = useContext(UserContext);
@@ -23,8 +36,9 @@ const Profile = () => {
         imgUserFile: null,
         newPassword: '',
         confirmPassword: '',
+        currentPassword: '', // Thêm currentPassword vào formData
     });
-    const [imgUserPreview, setimgUserPreview] = useState('');
+    const [imgUserPreview, setImgUserPreview] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const navigate = useNavigate();
 
@@ -69,12 +83,9 @@ const Profile = () => {
             const [user, created, joined] = await Promise.all([userResponse, createdResponse, joinedResponse]);
             setUserData(user);
             setCreatedChallenges(created.documents);
-            const userImage =
-                user.imgUser ||
-                DEFAULT_IMG;
-            setimgUserPreview(userImage);
+            const userImage = user.imgUser || DEFAULT_IMG;
+            setImgUserPreview(userImage);
 
-            // 🔹 Lấy thông tin thử thách từ collection "challenges" dựa trên challengeId
             const joinedChallengesData = await Promise.all(
                 joined.documents.map(async (entry) => {
                     try {
@@ -85,8 +96,8 @@ const Profile = () => {
                         );
                         return {
                             ...challengeData,
-                            userVideo: entry.videoURL, // Gắn video của user vào thử thách
-                            userDescribe: entry.describe, // Gắn mô tả của user vào thử thách
+                            userVideo: entry.videoURL,
+                            userDescribe: entry.describe,
                             fileId: entry.fileId,
                         };
                     } catch (error) {
@@ -96,7 +107,6 @@ const Profile = () => {
                 }),
             );
 
-            // 🔹 Loại bỏ các thử thách bị lỗi
             setJoinedChallenges(joinedChallengesData.filter(Boolean));
         } catch (error) {
             console.error('Lỗi khi lấy thông tin người dùng:', error.message);
@@ -104,6 +114,7 @@ const Profile = () => {
             setLoading(false);
         }
     }, [userId]);
+
     useEffect(() => {
         fetchUserData();
     }, [fetchUserData]);
@@ -146,25 +157,20 @@ const Profile = () => {
             let imgChallengeUrl = editingChallenge.imgChallenge;
 
             // Nếu có ảnh mới thì tải lên
-            const uploadImagePromise =
-                challengeForm.imgChallenge instanceof File
-                    ? storage.createFile(BUCKET_ID, 'unique()', challengeForm.imgChallenge)
-                    : null;
+            if (challengeForm.imgChallenge instanceof File) {
+                const fileResponse = await storage.createFile(BUCKET_ID, ID.unique(), challengeForm.imgChallenge);
+                imgChallengeUrl = storage.getFileView(BUCKET_ID, fileResponse.$id).href; // Sử dụng $id từ fileResponse
+            }
 
-            // Cập nhật dữ liệu thử thách song song với việc tải ảnh (nếu có)
-            const [fileResponse, updatedChallenge] = await Promise.all([
-                uploadImagePromise,
-                databases.updateDocument(DATABASE_ID, CHALLENGES_ID, editingChallenge.$id, {
-                    nameChallenge: challengeForm.nameChallenge,
-                    field: challengeForm.field,
-                    describe: challengeForm.describe,
-                    imgChallenge: uploadImagePromise
-                        ? storage.getFileView(BUCKET_ID, (await uploadImagePromise).$id)
-                        : imgChallengeUrl,
-                }),
-            ]);
+            // Cập nhật dữ liệu thử thách
+            const updatedChallenge = await databases.updateDocument(DATABASE_ID, CHALLENGES_ID, editingChallenge.$id, {
+                nameChallenge: challengeForm.nameChallenge,
+                field: challengeForm.field,
+                describe: challengeForm.describe,
+                imgChallenge: imgChallengeUrl,
+            });
 
-            // Cập nhật danh sách thử thách mà không gây re-render toàn bộ
+            // Cập nhật danh sách thử thách
             setCreatedChallenges((prev) => prev.map((c) => (c.$id === updatedChallenge.$id ? updatedChallenge : c)));
             setEditingChallenge(null);
             alert('Cập nhật thử thách thành công!');
@@ -172,7 +178,7 @@ const Profile = () => {
             console.error('Lỗi khi cập nhật thử thách:', error);
             alert('Cập nhật thử thách thất bại!');
         } finally {
-            setIsSavingChallenge(false); // Tắt loading sau khi lưu xong
+            setIsSavingChallenge(false);
         }
     };
 
@@ -193,12 +199,9 @@ const Profile = () => {
 
         try {
             await databases.deleteDocument(DATABASE_ID, CHALLENGES_ID, challengeId);
-
-            // Cập nhật UI: Xóa thử thách khỏi danh sách hiển thị
             setCreatedChallenges((prevChallenges) =>
                 prevChallenges.filter((challenge) => challenge.$id !== challengeId),
             );
-
             alert('Xóa thử thách thành công!');
         } catch (error) {
             console.error('Lỗi khi xóa thử thách:', error.message);
@@ -210,7 +213,7 @@ const Profile = () => {
         const file = e.target.files[0];
         if (file) {
             setFormData((prev) => ({ ...prev, imgUserFile: file }));
-            setimgUserPreview(URL.createObjectURL(file));
+            setImgUserPreview(URL.createObjectURL(file));
         }
     };
 
@@ -235,7 +238,7 @@ const Profile = () => {
         if (!validatePassword()) return;
 
         try {
-            const accountInfo = await account.get(); // Kiểm tra session
+            const accountInfo = await account.get();
             if (!accountInfo) {
                 setErrorMessage('Bạn cần đăng nhập để thực hiện thao tác này.');
                 return;
@@ -243,29 +246,25 @@ const Profile = () => {
 
             let imgUserUrl = userData.imgUser;
 
-            // 🔹 Tải ảnh mới nếu có
             if (formData.imgUserFile) {
-                const fileResponse = await storage.createFile(BUCKET_ID, 'unique()', formData.imgUserFile);
-                imgUserUrl = storage.getFileView(BUCKET_ID, fileResponse.$id);
+                const fileResponse = await storage.createFile(BUCKET_ID, ID.unique(), formData.imgUserFile);
+                imgUserUrl = storage.getFileView(BUCKET_ID, fileResponse.$id).href;
             }
 
-            // 🔹 Cập nhật thông tin đồng thời để tăng tốc xử lý
             await Promise.all([
                 account.updateName(formData.displayName),
                 isChangingPassword
                     ? account.updatePassword(formData.newPassword, formData.currentPassword)
-                    : Promise.resolve(), // Không đổi mật khẩu thì bỏ qua
+                    : Promise.resolve(),
                 databases.updateDocument(DATABASE_ID, USERS_ID, userId, {
                     displayName: formData.displayName,
                     imgUser: imgUserUrl,
                 }),
             ]);
-            // 🔹 Cập nhật tên hiển thị trong bảng `joinedChallenges`
-            const joinedChallengesResponse = await databases.listDocuments(
-                DATABASE_ID,
-                JOINED_CHALLENGES_ID,
-                [Query.equal('idUserJoined', userId)],
-            );
+
+            const joinedChallengesResponse = await databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [
+                Query.equal('idUserJoined', userId),
+            ]);
 
             const updateJoinedChallenges = joinedChallengesResponse.documents.map((doc) =>
                 databases.updateDocument(DATABASE_ID, JOINED_CHALLENGES_ID, doc.$id, {
@@ -273,12 +272,9 @@ const Profile = () => {
                 }),
             );
 
-            // 🔹 Cập nhật tên hiển thị trong bảng `challenges`
-            const createdChallengesResponse = await databases.listDocuments(
-                DATABASE_ID,
-                CHALLENGES_ID,
-                [Query.equal('idUserCreated', userId)],
-            );
+            const createdChallengesResponse = await databases.listDocuments(DATABASE_ID, CHALLENGES_ID, [
+                Query.equal('idUserCreated', userId),
+            ]);
 
             const updateCreatedChallenges = createdChallengesResponse.documents.map((doc) =>
                 databases.updateDocument(DATABASE_ID, CHALLENGES_ID, doc.$id, {
@@ -286,7 +282,6 @@ const Profile = () => {
                 }),
             );
 
-            // 🔹 Chạy tất cả cập nhật đồng thời để tăng tốc độ
             await Promise.all([...updateJoinedChallenges, ...updateCreatedChallenges]);
 
             alert('Cập nhật thông tin thành công!');
@@ -312,17 +307,14 @@ const Profile = () => {
             }
 
             try {
-                // 🔹 1. Xóa video khỏi Storage (nếu có)
                 const deleteFilePromise = challenge.fileId
                     ? storage.deleteFile(BUCKET_ID, challenge.fileId)
                     : Promise.resolve();
 
-                // 🔹 2. Tìm và xóa dữ liệu tham gia thử thách
-                const joinedChallengesQuery = await databases.listDocuments(
-                    DATABASE_ID,
-                    JOINED_CHALLENGES_ID,
-                    [Query.equal('idUserJoined', userId), Query.equal('challengeId', challenge.$id)],
-                );
+                const joinedChallengesQuery = await databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [
+                    Query.equal('idUserJoined', userId),
+                    Query.equal('challengeId', challenge.$id),
+                ]);
 
                 const joinedChallenge = joinedChallengesQuery.documents[0];
                 if (!joinedChallenge) {
@@ -335,24 +327,15 @@ const Profile = () => {
                     joinedChallenge.$id,
                 );
 
-                // 🔹 3. Giảm số lượng người tham gia
                 const updatedParticipants = Math.max(challenge.participants - 1, 0);
-                const updateChallengePromise = databases.updateDocument(
-                    DATABASE_ID,
-                    CHALLENGES_ID,
-                    challenge.$id,
-                    { participants: updatedParticipants },
-                );
+                const updateChallengePromise = databases.updateDocument(DATABASE_ID, CHALLENGES_ID, challenge.$id, {
+                    participants: updatedParticipants,
+                });
 
-                // 🔹 4. Trừ điểm của người tham gia và chủ thử thách
-                const updatePoints = async (userId) => {
-                    const userData = await databases.getDocument(
-                        DATABASE_ID,
-                        USERS_ID,
-                        userId,
-                    );
+                const updatePoints = async (targetUserId) => {
+                    const userData = await databases.getDocument(DATABASE_ID, USERS_ID, targetUserId);
                     const newPoints = Math.max((userData.points || 0) - 5, 0);
-                    return databases.updateDocument(DATABASE_ID, USERS_ID, userId, {
+                    return databases.updateDocument(DATABASE_ID, USERS_ID, targetUserId, {
                         points: newPoints,
                     });
                 };
@@ -365,20 +348,13 @@ const Profile = () => {
                 const updatePointsPromises = [updatePoints(userId)];
                 if (ownerId) updatePointsPromises.push(updatePoints(ownerId));
 
-                // 🔹 5. Gửi thông báo đến chủ thử thách
-                const notificationPromise = databases.createDocument(
-                    DATABASE_ID,
-                    NOTIFICATIONS_ID,
-                    ID.unique(),
-                    {
-                        userId: ownerId,
-                        message: `${displayName} đã rời khỏi thử thách của bạn: ${challengeData.nameChallenge}. Bạn bị trừ 5 điểm!`,
-                        challengeId: challenge.$id,
-                        createdAt: new Date().toISOString(),
-                    },
-                );
+                const notificationPromise = databases.createDocument(DATABASE_ID, NOTIFICATIONS_ID, ID.unique(), {
+                    userId: ownerId,
+                    message: `${displayName} đã rời khỏi thử thách của bạn: ${challengeData.nameChallenge}. Bạn bị trừ 5 điểm!`,
+                    challengeId: challenge.$id,
+                    createdAt: new Date().toISOString(),
+                });
 
-                // 🔹 6. Chạy tất cả các request song song
                 await Promise.all([
                     deleteFilePromise,
                     deleteJoinedChallengePromise,
@@ -387,16 +363,14 @@ const Profile = () => {
                     notificationPromise,
                 ]);
 
-                // 🔹 7. Cập nhật UI
                 setJoinedChallenges((prev) => prev.filter((c) => c.$id !== challenge.$id));
-
                 alert('Bạn đã rời khỏi thử thách thành công!');
             } catch (error) {
                 console.error('Lỗi khi rời khỏi thử thách:', error);
                 alert('Không thể rời khỏi thử thách, vui lòng thử lại.');
             }
         },
-        [userId, displayName, setJoinedChallenges],
+        [userId, displayName],
     );
 
     const handleLogout = async () => {
@@ -417,28 +391,28 @@ const Profile = () => {
         return (
             <div className="relative container mx-auto mt-8 mb-[90px] p-6 bg-white rounded-lg shadow">
                 <div className="mt-6 flex justify-end absolute gap-2 top-14 right-3">
-                    <Skeleton width={102} height={34} className="py-2 px-4 rounded"></Skeleton>
-                    <Skeleton width={46} height={34} className="py-2 px-4 rounded"></Skeleton>
+                    <Skeleton width={102} height={34} className="py-2 px-4 rounded" />
+                    <Skeleton width={46} height={34} className="py-2 px-4 rounded" />
                 </div>
                 <div className="flex items-center">
                     <Skeleton circle={true} height={100} width={100} />
-                    <Skeleton width={180} height={30} className="ml-4"></Skeleton>
+                    <Skeleton width={180} height={30} className="ml-4" />
                 </div>
                 <div className="mt-10">
-                    <Skeleton width={152} height={23}></Skeleton>
+                    <Skeleton width={152} height={23} />
                     <div className="grid grid-cols-3 gap-4 mt-4">
-                        <Skeleton className="p-4" width={402} height={69}></Skeleton>
-                        <Skeleton className="p-4" width={402} height={69}></Skeleton>
-                        <Skeleton className="p-4" width={402} height={69}></Skeleton>
+                        <Skeleton className="p-4" width={402} height={69} />
+                        <Skeleton className="p-4" width={402} height={69} />
+                        <Skeleton className="p-4" width={402} height={69} />
                     </div>
                 </div>
                 <div className="mt-10">
-                    <Skeleton width={100} height={18}></Skeleton>
+                    <Skeleton width={100} height={18} />
                     <div className="mt-2 space-y-2">
-                        <Skeleton className="p-3 mb-2" height={69}></Skeleton>
-                        <Skeleton className="p-3 mb-2" height={69}></Skeleton>
-                        <Skeleton className="p-3 mb-2" height={69}></Skeleton>
-                        <Skeleton className="p-3 mb-2" height={69}></Skeleton>
+                        <Skeleton className="p-3 mb-2" height={69} />
+                        <Skeleton className="p-3 mb-2" height={69} />
+                        <Skeleton className="p-3 mb-2" height={69} />
+                        <Skeleton className="p-3 mb-2" height={69} />
                     </div>
                 </div>
             </div>
@@ -459,7 +433,7 @@ const Profile = () => {
                 </button>
                 <Tippy content="Đăng xuất">
                     <button className="bg-red-500 text-white font-semibold py-2 px-4 rounded" onClick={handleLogout}>
-                        <FontAwesomeIcon icon={faRightFromBracket}></FontAwesomeIcon>
+                        <FontAwesomeIcon icon={faRightFromBracket} />
                     </button>
                 </Tippy>
             </div>
@@ -588,7 +562,7 @@ const Profile = () => {
                                         />
                                     </div>
                                     <div className="flex">
-                                        <label className="w-[135px] leading-[40px]">lĩnh vực:</label>
+                                        <label className="w-[135px] leading-[40px]">Lĩnh vực:</label>
                                         <select
                                             name="field"
                                             value={challengeForm.field}
@@ -635,7 +609,7 @@ const Profile = () => {
                                         {isSavingChallenge ? 'Đang lưu...' : 'Lưu'}
                                     </button>
                                     <button
-                                        className="bg-gray-400 rounded px-4 py-2 text-black "
+                                        className="bg-gray-400 rounded px-4 py-2 text-black"
                                         onClick={() => setEditingChallenge(null)}
                                         disabled={isSavingChallenge}
                                     >
@@ -652,7 +626,6 @@ const Profile = () => {
                                             <div className="relative" key={challenge.$id}>
                                                 <Link
                                                     to={`/challenge/${challenge.$id}`}
-                                                    key={challenge.$id}
                                                     className="flex items-center justify-between bg-white p-3 rounded-lg shadow"
                                                 >
                                                     <div>
@@ -707,7 +680,6 @@ const Profile = () => {
                                         </button>
                                         <Link
                                             to={`/challenge/${challenge.$id}`}
-                                            key={challenge.$id}
                                             className="flex items-center justify-between bg-white p-4 rounded-lg shadow"
                                         >
                                             <div>
@@ -716,13 +688,12 @@ const Profile = () => {
                                                 <p className="text-sm text-blue-500">
                                                     {challenge.participants} người tham gia
                                                 </p>
-                                                {/* 🔹 Hiển thị video của người dùng */}
                                                 <video
                                                     src={challenge.userVideo}
                                                     controls
                                                     className="w-[300px] h-[200px] mt-2 rounded-lg"
                                                     loading="lazy"
-                                                ></video>
+                                                />
                                                 <p className="text-gray-600 mt-2">Mô tả: {challenge.userDescribe}</p>
                                             </div>
                                         </Link>
