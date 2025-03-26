@@ -6,7 +6,6 @@ import Button from '~/components/Button';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faBell,
-    faCircleUser,
     faComments,
     faRankingStar,
     faScrewdriverWrench,
@@ -19,7 +18,17 @@ import { useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Search from '../Search';
 import { UserContext } from '~/contexts/UserContext';
-import { account, databases, client, Query,DATABASE_ID,USERS_ID,MESSAGES_ID,NOTIFICATIONS_ID } from '~/appwrite/config';
+import {
+    account,
+    databases,
+    client,
+    Query,
+    DATABASE_ID,
+    USERS_ID,
+    MESSAGES_ID,
+    NOTIFICATIONS_ID,
+    DEFAULT_IMG,
+} from '~/appwrite/config';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 
@@ -37,6 +46,7 @@ function Header() {
     const [notiCount, setNotiCount] = useState(0);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef(null);
+    const [userAvatar, setUserAvatar] = useState(DEFAULT_IMG);
 
     useEffect(() => {
         const fetchCurrentUser = async () => {
@@ -46,6 +56,9 @@ function Header() {
                 setUserId(user.$id);
                 setDisplayName(user.name);
                 setIsAdmin(user.labels?.includes('admin') || false);
+                const userDoc = await databases.getDocument(DATABASE_ID, USERS_ID, user.$id);
+                const avatar = userDoc.imgUser || DEFAULT_IMG;
+                setUserAvatar(avatar);
             } catch {
                 setCurrentUser(null);
                 setIsAdmin(false);
@@ -69,6 +82,9 @@ function Header() {
                 setCurrentUser(user);
                 setUserId(user.$id);
                 setDisplayName(user.name);
+                const userDoc = await databases.getDocument(DATABASE_ID, USERS_ID, user.$id);
+                const avatar = userDoc.imgUser || DEFAULT_IMG;
+                setUserAvatar(avatar);
                 setIsModalOpen(false);
             } catch (error) {
                 setLoginError('Đăng nhập thất bại: ' + error.message);
@@ -156,17 +172,11 @@ function Header() {
         return () => unsubscribe();
     }, [currentUser]);
 
-    useEffect(() => {
-        if (location.pathname === '/chat' && currentUser) {
-            // Không cần reset unreadCount về 0 ở đây nữa, vì nó sẽ được cập nhật qua selectUser
-        }
-    }, [currentUser, location.pathname]);
-
     const fetchNotiCount = async (userId) => {
         try {
             const response = await databases.listDocuments(
                 DATABASE_ID, // Database ID
-                'notifications', // Collection ID
+                NOTIFICATIONS_ID, // Collection ID
                 [
                     Query.equal('userId', userId),
                     Query.equal('isRead', false), // Giả sử bạn có trường 'isRead' để đánh dấu thông báo đã đọc
@@ -387,7 +397,11 @@ function Header() {
                                     className={cx('iconProfile', { active: location.pathname === '/profile' })}
                                     to="/profile"
                                 >
-                                    <FontAwesomeIcon icon={faCircleUser} />
+                                    <img
+                                        src={userAvatar}
+                                        alt="User Avatar"
+                                        className="w-12 h-12 rounded-full object-cover"
+                                    />
                                 </Link>
                             </Tippy>
                         </>
@@ -419,7 +433,12 @@ function Header() {
                                     </Link>
                                 )}
                                 <Link to="/profile" onClick={handleMenuItemClick}>
-                                    <FontAwesomeIcon className={cx('action-mobi')} icon={faCircleUser} /> Trang cá nhân
+                                    <img
+                                        src={userAvatar}
+                                        alt="User Avatar"
+                                        className="w-11 h-11 rounded-full object-cover inline-block mr-2"
+                                    />
+                                    Trang cá nhân
                                 </Link>
                                 <Link to="/friends" onClick={handleMenuItemClick}>
                                     <FontAwesomeIcon className={cx('action-mobi')} icon={faUserGroup} /> Bạn bè

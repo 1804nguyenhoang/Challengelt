@@ -485,7 +485,7 @@ function Chat() {
     const sendMessage = useCallback(async () => {
         if (!message.trim() || !selectedUser) return;
         setIsSendingMessage(true);
-
+    
         const newMessage = {
             senderId: userId,
             receiverId: selectedUser.$id,
@@ -493,20 +493,31 @@ function Chat() {
             createdAt: new Date().toISOString(),
             senderName: displayName,
             isRead: false,
-            replyTo: replyingTo ? replyingTo.$id : null, // Thêm ID tin nhắn gốc nếu đang trả lời
+            replyTo: replyingTo ? replyingTo.$id : null,
         };
-
+    
         try {
             await databases.createDocument(DATABASE_ID, MESSAGES_ID, ID.unique(), newMessage);
             setMessage('');
-            setReplyingTo(null); // Reset trạng thái trả lời sau khi gửi
-            inputRef.current?.focus();
+            setReplyingTo(null);
         } catch (error) {
             console.error('Error sending message:', error);
         } finally {
             setIsSendingMessage(false);
+            // Sử dụng setTimeout để đảm bảo focus được gọi sau khi DOM re-render
+            setTimeout(() => {
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                }
+            }, 0);
         }
     }, [message, selectedUser, userId, displayName, replyingTo]);
+
+    useEffect(() => {
+        if (!isSendingMessage && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isSendingMessage]);
 
     const updateMessage = useCallback(async () => {
         if (!editMessageContent.trim() || !editingMessage) return;
