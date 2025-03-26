@@ -485,7 +485,7 @@ function Admin() {
             {activeTab === 'users' && !showPendingChallenges && (
                 <div>
                     <h2 className="text-2xl font-semibold mb-4 text-center">Quản lý người dùng</h2>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mb-4">
+                    <div className="flex-1">
                         <label className="w-full sm:w-[150px] text-lg">Tìm kiếm người dùng: </label>
                         <div className="flex-1 relative">
                             <input
@@ -851,7 +851,7 @@ function Admin() {
             {activeTab === 'videos' && !showPendingChallenges && (
                 <div className="container mx-auto p-4 bg-white rounded-lg">
                     <h2 className="text-2xl font-semibold mb-4 text-center">Quản lý video</h2>
-                    <div className="flex flex-col sm:flex-row sm:items-center">
+                    <div className="flex-1">
                         <label className="w-full sm:w-[150px] text-lg">Tìm kiếm video: </label>
                         <div className="relative">
                             <input

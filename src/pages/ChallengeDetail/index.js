@@ -171,10 +171,10 @@ const Participant = React.memo(({ participant, userId, onLike, isLiking, onComme
                                     />
                                     <div className="flex-1">
                                         <div className="bg-gray-200 p-3 rounded-lg shadow-sm">
-                                            <span className="font-semibold text-sm text-gray-800">
+                                            <span className="font-semibold text-2xl text-gray-800">
                                                 {comment.userName}
                                             </span>
-                                            <p className="text-gray-700 text-sm mt-1">{comment.commentText}</p>
+                                            <p className="text-gray-700 text-xl mt-1">{comment.commentText}</p>
                                         </div>
                                         <div className="flex items-center mt-2 text-xs text-gray-500">
                                             <span className="mr-3">{formatTimestamp(comment.createdAt)}</span>
