@@ -13,7 +13,6 @@ function Footer() {
                 <Link
                     className={cx('link', {
                         active: location.pathname === '/home',
-                        active: location.pathname === '/'
                     })}
                     to="/home"
                 >

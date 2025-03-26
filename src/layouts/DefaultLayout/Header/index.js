@@ -48,43 +48,52 @@ function Header() {
     const menuRef = useRef(null);
     const [userAvatar, setUserAvatar] = useState(DEFAULT_IMG);
 
+    // Fetch current user
     useEffect(() => {
+        let mounted = true;
+
         const fetchCurrentUser = async () => {
             try {
                 const user = await account.get();
-                setCurrentUser(user);
-                setUserId(user.$id);
-                setDisplayName(user.name);
-                setIsAdmin(user.labels?.includes('admin') || false);
-                const userDoc = await databases.getDocument(DATABASE_ID, USERS_ID, user.$id);
-                const avatar = userDoc.imgUser || DEFAULT_IMG;
-                setUserAvatar(avatar);
+                if (mounted) {
+                    setCurrentUser(user);
+                    setUserId(user.$id);
+                    setDisplayName(user.name);
+                    setIsAdmin(user.labels?.includes('admin') || false);
+                    const userDoc = await databases.getDocument(DATABASE_ID, USERS_ID, user.$id);
+                    setUserAvatar(userDoc.imgUser || DEFAULT_IMG);
+                }
             } catch {
-                setCurrentUser(null);
-                setIsAdmin(false);
+                if (mounted) {
+                    setCurrentUser(null);
+                    setIsAdmin(false);
+                }
             }
         };
+
         fetchCurrentUser();
+        return () => {
+            mounted = false;
+        };
     }, [setUserId, setDisplayName]);
 
+    // Handle login
     const handleLogin = useCallback(
         async (e) => {
             e.preventDefault();
             setLoginError('');
             setIsLoading(true);
 
-            const email = e.target.email.value;
-            const password = e.target.password.value;
-
             try {
+                const email = e.target.email.value;
+                const password = e.target.password.value;
                 await account.createEmailPasswordSession(email, password);
                 const user = await account.get();
                 setCurrentUser(user);
                 setUserId(user.$id);
                 setDisplayName(user.name);
                 const userDoc = await databases.getDocument(DATABASE_ID, USERS_ID, user.$id);
-                const avatar = userDoc.imgUser || DEFAULT_IMG;
-                setUserAvatar(avatar);
+                setUserAvatar(userDoc.imgUser || DEFAULT_IMG);
                 setIsModalOpen(false);
             } catch (error) {
                 setLoginError('Đăng nhập thất bại: ' + error.message);
@@ -92,9 +101,10 @@ function Header() {
                 setIsLoading(false);
             }
         },
-        [setUserId, setDisplayName],
+        [setUserId, setDisplayName]
     );
 
+    // Handle register
     const handleRegister = useCallback(async (e) => {
         e.preventDefault();
         setLoginError('');
@@ -104,8 +114,10 @@ function Header() {
         const password = e.target.password.value;
         const confirmPassword = e.target.confirmPassword.value;
         const name = e.target.name.value;
+
         if (password !== confirmPassword) {
             setLoginError('Mật khẩu xác nhận không khớp.');
+            setIsLoading(false);
             return;
         }
 
@@ -124,7 +136,8 @@ function Header() {
         }
     }, []);
 
-    const fetchUnreadCount = async (userId) => {
+    // Fetch unread messages count
+    const fetchUnreadCount = useCallback(async (userId) => {
         try {
             const response = await databases.listDocuments(DATABASE_ID, MESSAGES_ID, [
                 Query.equal('receiverId', userId),
@@ -132,115 +145,101 @@ function Header() {
             ]);
             const unreadMessages = response.documents.length;
             setUnreadCount(unreadMessages);
-            localStorage.setItem(`messCount_${userId}`, unreadMessages); // Lưu vào localStorage
-            return unreadMessages; // Trả về giá trị để dùng nếu cần
+            localStorage.setItem(`messCount_${userId}`, unreadMessages);
+            return unreadMessages;
         } catch (error) {
             console.error('Lỗi khi lấy số tin nhắn chưa đọc:', error);
             return 0;
         }
-    };
+    }, [setUnreadCount]);
 
+    // Handle messages subscription
     useEffect(() => {
         if (!currentUser) return;
 
-        // Đồng bộ số tin nhắn chưa đọc từ server khi đăng nhập
         fetchUnreadCount(currentUser.$id);
-
-        // Lấy giá trị từ localStorage làm giá trị ban đầu (nếu có)
         const savedMessCount = localStorage.getItem(`messCount_${currentUser.$id}`);
-        if (savedMessCount) {
-            setUnreadCount(parseInt(savedMessCount, 10));
-        }
+        if (savedMessCount) setUnreadCount(parseInt(savedMessCount, 10));
 
-        // Subscription để cập nhật thời gian thực
         const unsubscribe = client.subscribe(
             `databases.${DATABASE_ID}.collections.${MESSAGES_ID}.documents`,
             (response) => {
                 const payload = response.payload;
-                if (!payload) return;
-
-                if (payload.receiverId === currentUser.$id && !payload.isRead) {
+                if (payload?.receiverId === currentUser.$id && !payload.isRead) {
                     setUnreadCount((prev) => {
-                        const newMessCount = prev + 1;
-                        localStorage.setItem(`messCount_${currentUser.$id}`, newMessCount);
-                        return newMessCount;
+                        const newCount = prev + 1;
+                        localStorage.setItem(`messCount_${currentUser.$id}`, newCount);
+                        return newCount;
                     });
                 }
-            },
+            }
         );
 
         return () => unsubscribe();
-    }, [currentUser]);
+    }, [currentUser, fetchUnreadCount, setUnreadCount]);
 
-    const fetchNotiCount = async (userId) => {
+    // Fetch notifications count
+    const fetchNotiCount = useCallback(async (userId) => {
         try {
-            const response = await databases.listDocuments(
-                DATABASE_ID, // Database ID
-                NOTIFICATIONS_ID, // Collection ID
-                [
-                    Query.equal('userId', userId),
-                    Query.equal('isRead', false), // Giả sử bạn có trường 'isRead' để đánh dấu thông báo đã đọc
-                ],
-            );
-            const unreadNotifications = response.documents.length;
-            setNotiCount(unreadNotifications);
+            const response = await databases.listDocuments(DATABASE_ID, NOTIFICATIONS_ID, [
+                Query.equal('userId', userId),
+                Query.equal('isRead', false),
+            ]);
+            setNotiCount(response.documents.length);
         } catch (error) {
             console.error('Lỗi khi lấy số thông báo chưa đọc:', error);
         }
-    };
+    }, []);
 
+    // Handle notifications subscription
     useEffect(() => {
         if (!currentUser) return;
 
-        // Đồng bộ số thông báo chưa đọc từ server khi đăng nhập
         fetchNotiCount(currentUser.$id);
 
-        // Subscription để cập nhật thời gian thực
         const unsubscribe = client.subscribe(
             `databases.${DATABASE_ID}.collections.${NOTIFICATIONS_ID}.documents`,
             (response) => {
                 const newNotification = response.payload;
-                if (!newNotification) return;
-
-                if (newNotification.userId === currentUser.$id) {
-                    setNotiCount((prev) => {
-                        const newCount = prev + 1;
-                        return newCount;
-                    });
+                if (newNotification?.userId === currentUser.$id) {
+                    setNotiCount((prev) => prev + 1);
                 }
-            },
+            }
         );
 
         return () => unsubscribe();
-    }, [currentUser]);
+    }, [currentUser, fetchNotiCount]);
 
-    // Khi vào trang thông báo, reset số lượng thông báo chưa đọc
+    // Mark notifications as read
     useEffect(() => {
-        if (location.pathname === '/notification' && currentUser) {
-            const markNotificationsAsRead = async () => {
-                try {
-                    const response = await databases.listDocuments(DATABASE_ID, NOTIFICATIONS_ID, [
-                        Query.equal('userId', currentUser.$id),
-                        Query.equal('isRead', false),
-                    ]);
-                    const unreadNotifications = response.documents;
-                    // Cập nhật từng thông báo thành đã đọc
-                    for (const notification of unreadNotifications) {
-                        await databases.updateDocument(DATABASE_ID, NOTIFICATIONS_ID, notification.$id, {
+        if (!currentUser || location.pathname !== '/notification') return;
+
+        const markNotificationsAsRead = async () => {
+            try {
+                const response = await databases.listDocuments(DATABASE_ID, NOTIFICATIONS_ID, [
+                    Query.equal('userId', currentUser.$id),
+                    Query.equal('isRead', false),
+                ]);
+                const unreadNotifications = response.documents;
+
+                await Promise.all(
+                    unreadNotifications.map((notification) =>
+                        databases.updateDocument(DATABASE_ID, NOTIFICATIONS_ID, notification.$id, {
                             isRead: true,
-                        });
-                    }
-                    setNotiCount(0);
-                    localStorage.setItem(`notiCount_${currentUser.$id}`, 0); // Reset localStorage
-                } catch (error) {
-                    console.error('Lỗi khi đánh dấu thông báo đã đọc:', error);
-                }
-            };
-            markNotificationsAsRead();
-        }
+                        })
+                    )
+                );
+                setNotiCount(0);
+                localStorage.setItem(`notiCount_${currentUser.$id}`, '0');
+            } catch (error) {
+                console.error('Lỗi khi đánh dấu thông báo đã đọc:', error);
+            }
+        };
+
+        markNotificationsAsRead();
     }, [currentUser, location.pathname]);
 
-    // Đóng menu khi nhấp ra ngoài
+    // Handle click outside menu
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (
@@ -254,17 +253,21 @@ function Header() {
         };
 
         document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMenuOpen]);
 
-    const handleMenuItemClick = () => {
-        setIsMenuOpen(false);
-    };
+    // Close menu on path change or login modal open
     useEffect(() => {
-        setIsMenuOpen(false); // Đóng menu khi đường dẫn thay đổi
-    }, [location.pathname]);
+        setIsMenuOpen(false);
+    }, [location.pathname, isModalOpen]);
+
+    const handleMenuItemClick = () => setIsMenuOpen(false);
+
+    // Handle login button click (for both desktop and mobile)
+    const handleLoginClick = () => {
+        setIsModalOpen(true);
+        setIsMenuOpen(false); // Đóng menu khi mở modal ở mobile
+    };
 
     const ModalForm = () => (
         <div className={cx('modal-overlay', { show: isModalOpen })}>
@@ -297,8 +300,8 @@ function Header() {
                         {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : isRegister ? 'Đăng Ký' : 'Đăng Nhập'}
                     </button>
                     {!isLoading && (
-                        <>
-                            <p>Hoặc</p>
+                        <div className={cx('form-footer')}>
+                            <p className='text-center'>Hoặc</p>
                             <span>
                                 {isRegister ? (
                                     <>
@@ -316,7 +319,7 @@ function Header() {
                                     </>
                                 )}
                             </span>
-                        </>
+                        </div>
                     )}
                 </form>
             </div>
@@ -330,7 +333,6 @@ function Header() {
                     <img className={cx('logo')} src="/logoweb.png" height={50} width={70} alt="Challengelt" />
                 </Link>
                 <Search />
-
                 <div className={cx('action')}>
                     {currentUser ? (
                         <>
@@ -344,23 +346,17 @@ function Header() {
                                     </Link>
                                 </Tippy>
                             )}
-
                             <Tippy content="Bạn bè" placement="bottom">
                                 <Link
-                                    className={cx('iconFriends', {
-                                        active: location.pathname === '/friends',
-                                    })}
+                                    className={cx('iconFriends', { active: location.pathname === '/friends' })}
                                     to="/friends"
                                 >
                                     <FontAwesomeIcon icon={faUserGroup} />
                                 </Link>
                             </Tippy>
-
                             <Tippy content="Nhắn tin" placement="bottom">
                                 <Link
-                                    className={cx('iconMess', {
-                                        active: location.pathname === '/chat',
-                                    })}
+                                    className={cx('iconMess', { active: location.pathname === '/chat' })}
                                     to="/chat"
                                 >
                                     <FontAwesomeIcon icon={faComments} />
@@ -373,12 +369,9 @@ function Header() {
                                     )}
                                 </Link>
                             </Tippy>
-
                             <Tippy content="Thông báo" placement="bottom">
                                 <Link
-                                    className={cx('iconNotification', {
-                                        active: location.pathname === '/notification',
-                                    })}
+                                    className={cx('iconNotification', { active: location.pathname === '/notification' })}
                                     to="/notification"
                                 >
                                     <FontAwesomeIcon icon={faBell} />
@@ -391,7 +384,6 @@ function Header() {
                                     )}
                                 </Link>
                             </Tippy>
-
                             <Tippy content="Trang cá nhân" placement="bottom">
                                 <Link
                                     className={cx('iconProfile', { active: location.pathname === '/profile' })}
@@ -406,12 +398,9 @@ function Header() {
                             </Tippy>
                         </>
                     ) : (
-                        <>
-                            <Button className={cx('btn-login')} onClick={() => setIsModalOpen(true)} primary>
-                                Đăng Nhập
-                            </Button>
-                            {isModalOpen && <ModalForm />}
-                        </>
+                        <Button className={cx('btn-login')} onClick={handleLoginClick} primary>
+                            Đăng Nhập
+                        </Button>
                     )}
                     <Tippy content="Bảng xếp hạng" placement="bottom">
                         <Link className={cx('iconRank', { active: location.pathname === '/rank' })} to="/rank">
@@ -468,7 +457,7 @@ function Header() {
                                 </Link>
                             </>
                         ) : (
-                            <Button className={cx('btn-login')} onClick={() => setIsModalOpen(true)} primary>
+                            <Button className={cx('btn-login')} onClick={handleLoginClick} primary>
                                 Đăng Nhập
                             </Button>
                         )}

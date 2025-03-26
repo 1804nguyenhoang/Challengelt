@@ -26,7 +26,6 @@ function Chat() {
     const { userId, displayName, setUnreadCount } = useContext(UserContext);
     const navigate = useNavigate();
     const location = useLocation();
-    const [userIdFromUrl, setUserIdFromUrl] = useState('');
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -49,7 +48,6 @@ function Chat() {
     const inputRef = useRef(null);
     const abortControllerRef = useRef(null);
     const [unreadCounts, setUnreadCounts] = useState({});
-    const [isUploadingFile, setIsUploadingFile] = useState(false);
     const [replyingTo, setReplyingTo] = useState(null);
     const [originalMessages, setOriginalMessages] = useState({});
     const [isChatView, setIsChatView] = useState(false);
@@ -115,7 +113,6 @@ function Chat() {
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const userIdParam = params.get('user') || '';
-        setUserIdFromUrl(userIdParam);
 
         if (userIdParam && users.length > 0) {
             const foundUser = users.find((u) => u.$id === userIdParam);
@@ -217,10 +214,9 @@ function Chat() {
 
     // Tải thêm tin nhắn khi offset thay đổi
     useEffect(() => {
-        if (!userId || !selectedUser || offset === 0 || !hasMore || isLoadingMoreMessages) return;
+        if (!userId || !selectedUser || offset === 0 || !hasMore ) return;
 
         const fetchMoreMessages = async () => {
-            setIsLoadingMoreMessages(true);
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
@@ -264,8 +260,6 @@ function Chat() {
                 if (error.name !== 'AbortError') {
                     console.error('Error fetching more messages:', error);
                 }
-            } finally {
-                setIsLoadingMoreMessages(false);
             }
         };
 
@@ -396,7 +390,6 @@ function Chat() {
     const handleFileUpload = async (file) => {
         if (!file || !selectedUser) return;
 
-        setIsUploadingFile(true);
         try {
             // Tải file lên Appwrite Storage
             const response = await storage.createFile(
@@ -425,8 +418,6 @@ function Chat() {
             await databases.createDocument(DATABASE_ID, MESSAGES_ID, ID.unique(), newMessage);
         } catch (error) {
             console.error('Error uploading file:', error);
-        } finally {
-            setIsUploadingFile(false);
         }
     };
 

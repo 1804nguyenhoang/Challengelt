@@ -1,7 +1,22 @@
 'use client';
 import React, { useEffect, useState, useContext, useCallback, useMemo, Suspense } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { databases, Query, storage, ID, DATABASE_ID, COMMENTS_ID, USERS_ID, DEFAULT_IMG, CHALLENGES_ID, JOINED_CHALLENGES_ID, RATINGS_ID, LIKES_ID, NOTIFICATIONS_ID, BUCKET_ID } from '~/appwrite/config';
+import {
+    databases,
+    Query,
+    storage,
+    ID,
+    DATABASE_ID,
+    COMMENTS_ID,
+    USERS_ID,
+    DEFAULT_IMG,
+    CHALLENGES_ID,
+    JOINED_CHALLENGES_ID,
+    RATINGS_ID,
+    LIKES_ID,
+    NOTIFICATIONS_ID,
+    BUCKET_ID,
+} from '~/appwrite/config';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark, faStar as solidStar, faHeart as solidHeart, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { faStar as regularStar, faHeart as regularHeart, faComment } from '@fortawesome/free-regular-svg-icons';
@@ -57,21 +72,14 @@ const Participant = React.memo(({ participant, userId, onLike, isLiking, onComme
                 participantId: participant.$id,
                 userId,
                 userName: userDoc.displayName || 'Người dùng',
-                profilePicture:
-                    userDoc.imgUser ||
-                    DEFAULT_IMG,
+                profilePicture: userDoc.imgUser || DEFAULT_IMG,
                 commentText: newComment,
                 createdAt: new Date().toISOString(),
                 likes: 0,
                 likedBy: [],
                 parentCommentId: null,
             };
-            const response = await databases.createDocument(
-                DATABASE_ID,
-                COMMENTS_ID,
-                ID.unique(),
-                commentData,
-            );
+            const response = await databases.createDocument(DATABASE_ID, COMMENTS_ID, ID.unique(), commentData);
             setComments((prev) => [{ ...commentData, $id: response.$id }, ...prev]);
             setNewComment('');
             setTotalComments((prev) => prev + 1);
@@ -104,6 +112,19 @@ const Participant = React.memo(({ participant, userId, onLike, isLiking, onComme
         } catch (error) {
             console.error('Lỗi khi thích bình luận:', error);
             alert('Không thể thích bình luận. Vui lòng thử lại.');
+        }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa bình luận này?')) return;
+        try {
+            await databases.deleteDocument(DATABASE_ID, COMMENTS_ID, commentId);
+            setComments((prev) => prev.filter((comment) => comment.$id !== commentId));
+            setTotalComments((prev) => prev - 1);
+            alert('Bình luận đã được xóa.');
+        } catch (error) {
+            console.error('Lỗi khi xóa bình luận:', error);
+            alert('Không thể xóa bình luận. Vui lòng thử lại.');
         }
     };
 
@@ -189,6 +210,14 @@ const Participant = React.memo(({ participant, userId, onLike, isLiking, onComme
                                                 <span>THÍCH</span>
                                                 <span>({comment.likes})</span>
                                             </button>
+                                            {comment.userId === userId && (
+                                                <button
+                                                    onClick={() => handleDeleteComment(comment.$id)}
+                                                    className="ml-3 text-red-500 hover:text-red-700 transition-colors"
+                                                >
+                                                    XÓA
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -280,15 +309,9 @@ function ChallengeDetail() {
             } else {
                 const [challengeResponse, participantsResponse, ratingsResponse, likesResponse] = await Promise.all([
                     databases.getDocument(DATABASE_ID, CHALLENGES_ID, id),
-                    databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [
-                        Query.equal('challengeId', id),
-                    ]),
-                    databases.listDocuments(DATABASE_ID, RATINGS_ID, [
-                        Query.equal('challengeId', id),
-                    ]),
-                    databases.listDocuments(DATABASE_ID, LIKES_ID, [
-                        Query.equal('challengeId', id),
-                    ]),
+                    databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [Query.equal('challengeId', id)]),
+                    databases.listDocuments(DATABASE_ID, RATINGS_ID, [Query.equal('challengeId', id)]),
+                    databases.listDocuments(DATABASE_ID, LIKES_ID, [Query.equal('challengeId', id)]),
                 ]);
 
                 const participantsData = participantsResponse.documents;
@@ -363,12 +386,7 @@ function ChallengeDetail() {
 
                 await (isNewRating
                     ? databases.createDocument(DATABASE_ID, RATINGS_ID, ID.unique(), ratingData)
-                    : databases.updateDocument(
-                          DATABASE_ID,
-                          RATINGS_ID,
-                          existingRating.documents[0].$id,
-                          { rating },
-                      ));
+                    : databases.updateDocument(DATABASE_ID, RATINGS_ID, existingRating.documents[0].$id, { rating }));
 
                 const ratingsResponse = await databases.listDocuments(DATABASE_ID, RATINGS_ID, [
                     Query.equal('challengeId', id),
@@ -473,18 +491,10 @@ function ChallengeDetail() {
                             Query.equal('userId', userId),
                         ]);
                         if (likeDoc.documents.length > 0) {
-                            await databases.deleteDocument(
-                                DATABASE_ID,
-                                LIKES_ID,
-                                likeDoc.documents[0].$id,
-                            );
+                            await databases.deleteDocument(DATABASE_ID, LIKES_ID, likeDoc.documents[0].$id);
                         }
                     } else {
-                        const currentUserDoc = await databases.getDocument(
-                            DATABASE_ID,
-                            USERS_ID,
-                            userId,
-                        );
+                        const currentUserDoc = await databases.getDocument(DATABASE_ID, USERS_ID, userId);
                         await Promise.all([
                             databases.createDocument(DATABASE_ID, LIKES_ID, ID.unique(), {
                                 challengeId: id,
@@ -522,11 +532,7 @@ function ChallengeDetail() {
                 return;
             }
             try {
-                const currentUserDoc = await databases.getDocument(
-                    DATABASE_ID,
-                    USERS_ID,
-                    userId,
-                );
+                const currentUserDoc = await databases.getDocument(DATABASE_ID, USERS_ID, userId);
                 await databases.createDocument(DATABASE_ID, NOTIFICATIONS_ID, ID.unique(), {
                     userId: participantUserId,
                     message: `${currentUserDoc.displayName} đã bình luận trên video của bạn trong thử thách "${challenge.nameChallenge}": "${commentText}"`,

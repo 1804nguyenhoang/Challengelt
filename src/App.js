@@ -4,7 +4,7 @@ import { DefaultLayout } from './layouts';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useState } from 'react';
 function App() {
-    const [currentUser, setCurrentUser] = useState(null);
+    const [currentUser] = useState(null);
     return (
         <Router>
             <div className="App">
