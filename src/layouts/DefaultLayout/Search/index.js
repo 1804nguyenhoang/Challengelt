@@ -92,6 +92,7 @@ function Search() {
 
     return (
         <Tippy
+            placement="bottom"
             interactive
             visible={showResult && searchResult.length > 0}
             render={(attr) => (

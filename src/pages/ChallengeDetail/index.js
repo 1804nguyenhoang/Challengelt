@@ -297,63 +297,36 @@ function ChallengeDetail() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const cachedData = JSON.parse(localStorage.getItem(`challenge_${id}`));
-            if (cachedData && Date.now() - cachedData.timestamp < 5 * 60 * 1000) {
-                setChallenge(cachedData.challenge);
-                setParticipants(cachedData.participants);
-                setHasJoined(cachedData.hasJoined);
-                setUserRating(cachedData.userRating);
-                setAverageRating(cachedData.averageRating);
-                setRatingCount(cachedData.ratingCount);
-                setLikes(cachedData.likes);
-            } else {
-                const [challengeResponse, participantsResponse, ratingsResponse, likesResponse] = await Promise.all([
-                    databases.getDocument(DATABASE_ID, CHALLENGES_ID, id),
-                    databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [Query.equal('challengeId', id)]),
-                    databases.listDocuments(DATABASE_ID, RATINGS_ID, [Query.equal('challengeId', id)]),
-                    databases.listDocuments(DATABASE_ID, LIKES_ID, [Query.equal('challengeId', id)]),
-                ]);
+            const [challengeResponse, participantsResponse, ratingsResponse, likesResponse] = await Promise.all([
+                databases.getDocument(DATABASE_ID, CHALLENGES_ID, id),
+                databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [Query.equal('challengeId', id)]),
+                databases.listDocuments(DATABASE_ID, RATINGS_ID, [Query.equal('challengeId', id)]),
+                databases.listDocuments(DATABASE_ID, LIKES_ID, [Query.equal('challengeId', id)]),
+            ]);
 
-                const participantsData = participantsResponse.documents;
-                const ratings = ratingsResponse.documents;
-                const userRatingDoc = ratings.find((r) => r.userId === userId);
-                const avgRating =
-                    ratings.length > 0
-                        ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1)
-                        : 0;
-                const initialLikes = {};
-                participantsData.forEach((participant) => {
-                    const participantLikes = likesResponse.documents.filter(
-                        (like) => like.participantId === participant.$id,
-                    );
-                    initialLikes[participant.$id] = {
-                        count: participantLikes.length,
-                        likedByUser: participantLikes.some((like) => like.userId === userId),
-                    };
-                });
-
-                setChallenge(challengeResponse);
-                setParticipants(participantsData);
-                setHasJoined(participantsData.some((p) => p.idUserJoined === userId));
-                setUserRating(userRatingDoc ? userRatingDoc.rating : 0);
-                setAverageRating(avgRating);
-                setRatingCount(ratings.length);
-                setLikes(initialLikes);
-
-                localStorage.setItem(
-                    `challenge_${id}`,
-                    JSON.stringify({
-                        challenge: challengeResponse,
-                        participants: participantsData,
-                        hasJoined: participantsData.some((p) => p.idUserJoined === userId),
-                        userRating: userRatingDoc ? userRatingDoc.rating : 0,
-                        averageRating: avgRating,
-                        ratingCount: ratings.length,
-                        likes: initialLikes,
-                        timestamp: Date.now(),
-                    }),
+            const participantsData = participantsResponse.documents;
+            const ratings = ratingsResponse.documents;
+            const userRatingDoc = ratings.find((r) => r.userId === userId);
+            const avgRating =
+                ratings.length > 0 ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1) : 0;
+            const initialLikes = {};
+            participantsData.forEach((participant) => {
+                const participantLikes = likesResponse.documents.filter(
+                    (like) => like.participantId === participant.$id,
                 );
-            }
+                initialLikes[participant.$id] = {
+                    count: participantLikes.length,
+                    likedByUser: participantLikes.some((like) => like.userId === userId),
+                };
+            });
+
+            setChallenge(challengeResponse);
+            setParticipants(participantsData);
+            setHasJoined(participantsData.some((p) => p.idUserJoined === userId));
+            setUserRating(userRatingDoc ? userRatingDoc.rating : 0);
+            setAverageRating(avgRating);
+            setRatingCount(ratings.length);
+            setLikes(initialLikes);
         } catch (error) {
             console.error('Lỗi khi tải dữ liệu:', error);
             alert('Không thể tải thông tin thử thách. Vui lòng thử lại sau.');
@@ -408,7 +381,6 @@ function ChallengeDetail() {
                 setUserRating(rating);
                 setAverageRating(avgRating);
                 setRatingCount(ratings.length);
-                localStorage.removeItem(`challenge_${id}`);
                 alert('Đánh giá của bạn đã được ghi nhận!');
             } catch (error) {
                 console.error('Lỗi khi lưu đánh giá:', error);
@@ -448,7 +420,6 @@ function ChallengeDetail() {
             setHasJoined(false);
             setParticipants((prev) => prev.filter((p) => p.$id !== participant.$id));
             setChallenge((prev) => ({ ...prev, participants: updatedParticipants }));
-            localStorage.removeItem(`challenge_${id}`);
             alert('Bạn đã rời khỏi thử thách.');
         } catch (error) {
             console.error('Lỗi khi rời thử thách:', error);
@@ -510,7 +481,6 @@ function ChallengeDetail() {
                             }),
                         ]);
                     }
-                    localStorage.removeItem(`challenge_${id}`);
                 } catch (error) {
                     console.error('Lỗi khi thả/bỏ tim:', error);
                     setLikes((prev) => ({ ...prev, [participantId]: currentLikes }));
@@ -527,10 +497,6 @@ function ChallengeDetail() {
 
     const handleComment = useCallback(
         async (participantId, participantUserId, participantUserName, commentText) => {
-            if (participantUserId === userId) {
-                alert('Bạn không thể bình luận cho video của chính mình!');
-                return;
-            }
             try {
                 const currentUserDoc = await databases.getDocument(DATABASE_ID, USERS_ID, userId);
                 await databases.createDocument(DATABASE_ID, NOTIFICATIONS_ID, ID.unique(), {

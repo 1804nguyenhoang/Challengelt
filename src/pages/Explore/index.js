@@ -1,6 +1,14 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
-import { CHALLENGES_ID, DATABASE_ID, databases, DEFAULT_IMG, JOINED_CHALLENGES_ID, Query, USERS_ID } from '~/appwrite/config';
+import {
+    CHALLENGES_ID,
+    DATABASE_ID,
+    databases,
+    DEFAULT_IMG,
+    JOINED_CHALLENGES_ID,
+    Query,
+    USERS_ID,
+} from '~/appwrite/config';
 import { Link } from 'react-router-dom';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
@@ -130,7 +138,7 @@ function Explore() {
     };
 
     const sidebarContent = (
-        <aside className={cx("bg-white shadow-lg rounded-lg p-4",'sidebar')}>
+        <aside className={cx('bg-white shadow-lg rounded-lg p-4', 'sidebar')}>
             <div className="mb-8">
                 <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faFire}></FontAwesomeIcon>{' '}
@@ -142,7 +150,12 @@ function Explore() {
                     ) : popularChallenges.length > 0 ? (
                         popularChallenges.map((challenge) => (
                             <Link to={`/challenge/${challenge.$id}`} key={challenge.$id}>
-                                <li className={cx("py-2 px-3 hover:bg-gray-200 cursor-pointer rounded-lg text-[#f86666] border-top","item-sidebar")}>
+                                <li
+                                    className={cx(
+                                        'py-2 px-3 hover:bg-gray-200 cursor-pointer rounded-lg text-[#f86666] border-top',
+                                        'item-sidebar',
+                                    )}
+                                >
                                     {challenge.nameChallenge}
                                 </li>
                             </Link>
@@ -163,7 +176,12 @@ function Explore() {
                     ) : newestChallenges.length > 0 ? (
                         newestChallenges.map((challenge) => (
                             <Link to={`/challenge/${challenge.$id}`} key={challenge.$id}>
-                                <li className={cx("py-2 px-3 hover:bg-gray-200 cursor-pointer rounded-lg text-[#f86666] border-top","item-sidebar")}>
+                                <li
+                                    className={cx(
+                                        'py-2 px-3 hover:bg-gray-200 cursor-pointer rounded-lg text-[#f86666] border-top',
+                                        'item-sidebar',
+                                    )}
+                                >
                                     {challenge.nameChallenge}
                                 </li>
                             </Link>
@@ -190,7 +208,7 @@ function Explore() {
                                         alt="Avatar"
                                         className="w-12 h-12 mr-[4px] rounded-full object-cover"
                                     />
-                                    <p className={cx("mt-[3px]","item-sidebar")}>{user.displayName}</p>
+                                    <p className={cx('mt-[3px]', 'item-sidebar')}>{user.displayName}</p>
                                 </li>
                             </Link>
                         ))
@@ -203,197 +221,230 @@ function Explore() {
     );
 
     return (
-        <div className="container mb-32 mt-4 bg-gray-50 min-h-screen">
-            <div className="flex">
-                {isSmallScreen ? (
-                    <>
-                        <Button onClick={toggleDrawer(true)}>
-                            <FontAwesomeIcon icon={faBars} />
-                        </Button>
-                        <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
-                            {sidebarContent}
-                        </Drawer>
-                    </>
-                ) : (
-                    sidebarContent
-                )}
-                {/* Main Content */}
-                <main className="p-4">
-                    {/* Bộ lọc lĩnh vực */}
-                    <div className="mb-4 flex justify-between items-center">
-                        <h3 className={cx("font-bold","explore")}>Khám phá</h3>
-                        <div className="relative">
-                            <FontAwesomeIcon icon={faFilter} className="absolute left-2 top-3 text-gray-500" />
-                            <select
-                                className="pl-8 pr-4 py-2 border rounded-lg bg-white shadow"
-                                value={selectedField}
-                                onChange={(e) => {
-                                    setSelectedField(e.target.value);
+        <div>
+            {isSmallScreen ? <h1 className={cx('font-bold text-3xl text-center mt-4')}>Khám phá</h1> : <></>}
+            <div className="container relative mb-32 mt-4 bg-gray-50 min-h-screen">
+                <div className="flex">
+                    {isSmallScreen ? (
+                        <>
+                            <Button
+                                sx={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    left: '21px',
+                                    zIndex: 1200,
+                                    backgroundColor: '#f86666',
+                                    color: 'white',
+                                    '&:hover': { backgroundColor: '#e05555' },
                                 }}
-                                onClick={() => handleFilter(selectedField)}
+                                onClick={toggleDrawer(true)}
                             >
-                                {[
-                                    'Tất cả',
-                                    'Thể thao',
-                                    'Đời sống',
-                                    'Học tập',
-                                    'Nấu ăn',
-                                    'Sáng tạo',
-                                    'Nghệ thuật',
-                                    'Kinh doanh',
-                                    'Khoa học',
-                                    'Văn hóa',
-                                ].map((field) => (
-                                    <option key={field} value={field}>
-                                        {field}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
+                                <FontAwesomeIcon icon={faBars} />
+                            </Button>
+                            <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
+                                {sidebarContent}
+                            </Drawer>
+                        </>
+                    ) : (
+                        sidebarContent
+                    )}
+                    {/* Main Content */}
+                    <main className="p-4 w-full">
+                        {/* Bộ lọc lĩnh vực */}
+                        <div className="w-full relative mb-4 flex justify-between items-center pb-3">
+                            {isSmallScreen ? <></> : <h3 className={cx('font-bold', 'explore')}>Khám phá</h3>}
 
-                    {/* Danh sách thử thách */}
-                    <div className="bg-white p-4 shadow-lg rounded-lg mb-6">
-                        <h3 className="text-4xl font-bold mb-4">Thử thách</h3>
-                        {loading ? (
-                            <Skeleton className="pt-[9px] mb-[3px]" height={39} count={5} />
-                        ) : filteredChallenges.length > 0 ? (
-                            <>
-                                <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    {filteredChallenges.slice(0, visibleChallenges).map((challenge) => (
-                                        <Link to={`/challenge/${challenge.$id}`} key={challenge.$id}>
-                                            <li className="border rounded-lg p-4 hover:shadow-lg transition-shadow duration-200">
-                                                <div className={cx('challenge-mobi')}>
-                                                    <img
-                                                        src={challenge.imgChallenge || DEFAULT_IMG}
-                                                        alt="Avatar"
-                                                        className="w-[198px] h-[100px] mb-2 object-cover"
-                                                    />
-                                                    <div className={cx('challenge-info')}>
-                                                        <p className="text-3xl font-bold">
-                                                            {challenge.nameChallenge}{' '}
-                                                        </p>
-                                                        <p className="text-xl text-gray-500">
-                                                            <FontAwesomeIcon icon={faFlag}></FontAwesomeIcon> Lĩnh vực:{' '}
-                                                            {challenge.field}
-                                                        </p>
-                                                        <p className="text-xl text-gray-500">
-                                                            <FontAwesomeIcon icon={faPenNib}></FontAwesomeIcon> Tác giả:{' '}
-                                                            {challenge.createdBy}
-                                                        </p>
-                                                        <p className="text-xl text-gray-500">
-                                                            <FontAwesomeIcon icon={faUsers}></FontAwesomeIcon> Người tham gia:{' '}
-                                                            {challenge.participants}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </li>
-                                        </Link>
+                            <div className="absolute right-0">
+                                <FontAwesomeIcon icon={faFilter} className="absolute left-2 top-3 text-gray-500" />
+                                <select
+                                    className="pl-8 pr-4 py-2 border rounded-lg bg-white shadow"
+                                    value={selectedField}
+                                    onChange={(e) => {
+                                        setSelectedField(e.target.value);
+                                    }}
+                                    onClick={() => handleFilter(selectedField)}
+                                >
+                                    {[
+                                        'Tất cả',
+                                        'Thể thao',
+                                        'Đời sống',
+                                        'Học tập',
+                                        'Nấu ăn',
+                                        'Sáng tạo',
+                                        'Nghệ thuật',
+                                        'Kinh doanh',
+                                        'Khoa học',
+                                        'Văn hóa',
+                                    ].map((field) => (
+                                        <option key={field} value={field}>
+                                            {field}
+                                        </option>
                                     ))}
-                                </ul>
-                                <div className="flex space-x-2 mt-2">
-                                    {visibleChallenges < filteredChallenges.length && (
-                                        <button
-                                            className="bg-[#f86666] text-white px-3 py-1 rounded"
-                                            onClick={() => setVisibleChallenges(visibleChallenges + 4)}
-                                        >
-                                            Xem thêm
-                                        </button>
-                                    )}
-                                    {visibleChallenges > 4 && (
-                                        <button
-                                            className="bg-gray-300 px-3 py-1 rounded"
-                                            onClick={() => setVisibleChallenges(4)}
-                                        >
-                                            Ẩn bớt
-                                        </button>
-                                    )}
-                                </div>
-                            </>
-                        ) : (
-                            <p>Không có thử thách phù hợp</p>
-                        )}
-                    </div>
-
-                    {/* Danh sách Video */}
-                    <div className="bg-white p-4 shadow-lg rounded-lg">
-                        <h3 className="text-4xl font-bold mb-4">Video</h3>
-                        {loading ? (
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-2 border rounded-lg shadow-md">
-                                    <Skeleton width={190} height={24} className="ml-[50px]"></Skeleton>
-                                    <Skeleton className="ml-[20px] rounded-lg mb-2" width={250} height={141}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                </div>
-                                <div className="p-2 border rounded-lg shadow-md">
-                                    <Skeleton width={190} height={24} className="ml-[50px]"></Skeleton>
-                                    <Skeleton className="ml-[20px] rounded-lg mb-2" width={250} height={141}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                </div>
-                                <div className="p-2 border rounded-lg shadow-md">
-                                    <Skeleton width={190} height={24} className="ml-[50px]"></Skeleton>
-                                    <Skeleton className="ml-[20px] rounded-lg mb-2" width={250} height={141}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                    <Skeleton className="ml-[20px]" width={250}></Skeleton>
-                                </div>
+                                </select>
                             </div>
-                        ) : filteredVideos.length > 0 ? (
-                            <>
-                                <div className="grid md:grid-cols-3 gap-4">
-                                    {filteredVideos.slice(0, visibleVideos).map((video) => (
-                                        <Link to={`/challenge/${video.challengeId}`} key={video.$id}>
-                                            <div className="p-2 border rounded-lg shadow-md">
-                                                <p className="font-bold text-center">
-                                                    Người đăng: {video.uploaderName}
-                                                </p>
-                                                <div className={cx('video-mobi')}>
-                                                    <video
-                                                        src={video.videoURL}
-                                                        controls
-                                                        className={cx("rounded-lg mb-2 mx-auto",'video')}
-                                                        loading="lazy"
-                                                    ></video>
-                                                    <div className={cx('video-info')}>
-                                                        <p className={cx("text-gray-900",'tt')}>Thử thách: {video.challengeName}</p>
-                                                        <p className={cx("text-gray-700",'tt')}><FontAwesomeIcon icon={faFlag} /> Lĩnh vực: {video.field}</p>
-                                                        <p className={cx("text-gray-700",'tt')}>
-                                                        <FontAwesomeIcon icon={faPenNib} /> Mô tả: {video.describe}
-                                                        </p>
+                        </div>
+
+                        {/* Danh sách thử thách */}
+                        <div className="bg-white p-4 shadow-lg rounded-lg mb-6">
+                            <h3 className="text-4xl font-bold mb-4">Thử thách</h3>
+                            {loading ? (
+                                <Skeleton className="pt-[9px] mb-[3px]" height={39} count={5} />
+                            ) : filteredChallenges.length > 0 ? (
+                                <>
+                                    <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        {filteredChallenges.slice(0, visibleChallenges).map((challenge) => (
+                                            <Link to={`/challenge/${challenge.$id}`} key={challenge.$id}>
+                                                <li className="border rounded-lg p-4 hover:shadow-lg transition-shadow duration-200">
+                                                    <div className={cx('challenge-mobi')}>
+                                                        <img
+                                                            src={challenge.imgChallenge || DEFAULT_IMG}
+                                                            alt="Avatar"
+                                                            className="w-[198px] h-[100px] mb-2 object-cover"
+                                                        />
+                                                        <div className={cx('challenge-info')}>
+                                                            <p className="text-3xl font-bold">
+                                                                {challenge.nameChallenge}{' '}
+                                                            </p>
+                                                            <p className="text-xl text-gray-500">
+                                                                <FontAwesomeIcon icon={faFlag}></FontAwesomeIcon> Lĩnh
+                                                                vực: {challenge.field}
+                                                            </p>
+                                                            <p className="text-xl text-gray-500">
+                                                                <FontAwesomeIcon icon={faPenNib}></FontAwesomeIcon> Tác
+                                                                giả: {challenge.createdBy}
+                                                            </p>
+                                                            <p className="text-xl text-gray-500">
+                                                                <FontAwesomeIcon icon={faUsers}></FontAwesomeIcon> Người
+                                                                tham gia: {challenge.participants}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            </Link>
+                                        ))}
+                                    </ul>
+                                    <div className="flex space-x-2 mt-2">
+                                        {visibleChallenges < filteredChallenges.length && (
+                                            <button
+                                                className="bg-[#f86666] text-white px-3 py-1 rounded"
+                                                onClick={() => setVisibleChallenges(visibleChallenges + 4)}
+                                            >
+                                                Xem thêm
+                                            </button>
+                                        )}
+                                        {visibleChallenges > 4 && (
+                                            <button
+                                                className="bg-gray-300 px-3 py-1 rounded"
+                                                onClick={() => setVisibleChallenges(4)}
+                                            >
+                                                Ẩn bớt
+                                            </button>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <p>Không có thử thách phù hợp</p>
+                            )}
+                        </div>
+
+                        {/* Danh sách Video */}
+                        <div className="bg-white p-4 shadow-lg rounded-lg">
+                            <h3 className="text-4xl font-bold mb-4">Video</h3>
+                            {loading ? (
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="p-2 border rounded-lg shadow-md">
+                                        <Skeleton width={190} height={24} className="ml-[50px]"></Skeleton>
+                                        <Skeleton
+                                            className="ml-[20px] rounded-lg mb-2"
+                                            width={250}
+                                            height={141}
+                                        ></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                    </div>
+                                    <div className="p-2 border rounded-lg shadow-md">
+                                        <Skeleton width={190} height={24} className="ml-[50px]"></Skeleton>
+                                        <Skeleton
+                                            className="ml-[20px] rounded-lg mb-2"
+                                            width={250}
+                                            height={141}
+                                        ></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                    </div>
+                                    <div className="p-2 border rounded-lg shadow-md">
+                                        <Skeleton width={190} height={24} className="ml-[50px]"></Skeleton>
+                                        <Skeleton
+                                            className="ml-[20px] rounded-lg mb-2"
+                                            width={250}
+                                            height={141}
+                                        ></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                        <Skeleton className="ml-[20px]" width={250}></Skeleton>
+                                    </div>
+                                </div>
+                            ) : filteredVideos.length > 0 ? (
+                                <>
+                                    <div className="grid md:grid-cols-3 gap-4">
+                                        {filteredVideos.slice(0, visibleVideos).map((video) => (
+                                            <Link to={`/challenge/${video.challengeId}`} key={video.$id}>
+                                                <div className="p-2 border rounded-lg shadow-md">
+                                                    <p className="font-bold text-center">
+                                                        Người đăng: {video.uploaderName}
+                                                    </p>
+                                                    <div className={cx('video-mobi')}>
+                                                        <video
+                                                            src={video.videoURL}
+                                                            controls
+                                                            className={cx('rounded-lg mb-2 mx-auto', 'video')}
+                                                            loading="lazy"
+                                                        ></video>
+                                                        <div className={cx('video-info')}>
+                                                            <p className={cx('text-gray-900', 'tt')}>
+                                                                Thử thách: {video.challengeName}
+                                                            </p>
+                                                            <p className={cx('text-gray-700', 'tt')}>
+                                                                <FontAwesomeIcon icon={faFlag} /> Lĩnh vực:{' '}
+                                                                {video.field}
+                                                            </p>
+                                                            <p className={cx('text-gray-700', 'tt')}>
+                                                                <FontAwesomeIcon icon={faPenNib} /> Mô tả:{' '}
+                                                                {video.describe}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                                <div className="flex space-x-2 mt-2">
-                                    {visibleVideos < filteredVideos.length && (
-                                        <button
-                                            className="bg-[#f86666] px-3 py-1 rounded text-white"
-                                            onClick={() => setVisibleVideos(visibleVideos + 3)}
-                                        >
-                                            Xem thêm
-                                        </button>
-                                    )}
-                                    {visibleVideos > 3 && (
-                                        <button
-                                            className="bg-gray-300 px-3 py-1 rounded"
-                                            onClick={() => setVisibleVideos(3)}
-                                        >
-                                            Ẩn bớt
-                                        </button>
-                                    )}
-                                </div>
-                            </>
-                        ) : (
-                            <p>Không có video phù hợp</p>
-                        )}
-                    </div>
-                </main>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                    <div className="flex space-x-2 mt-2">
+                                        {visibleVideos < filteredVideos.length && (
+                                            <button
+                                                className="bg-[#f86666] px-3 py-1 rounded text-white"
+                                                onClick={() => setVisibleVideos(visibleVideos + 3)}
+                                            >
+                                                Xem thêm
+                                            </button>
+                                        )}
+                                        {visibleVideos > 3 && (
+                                            <button
+                                                className="bg-gray-300 px-3 py-1 rounded"
+                                                onClick={() => setVisibleVideos(3)}
+                                            >
+                                                Ẩn bớt
+                                            </button>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <p>Không có video phù hợp</p>
+                            )}
+                        </div>
+                    </main>
+                </div>
             </div>
         </div>
     );

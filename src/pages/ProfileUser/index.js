@@ -2,11 +2,10 @@
 import React, { useCallback, useEffect, useState, useContext, useRef, useMemo } from 'react';
 import Skeleton from 'react-loading-skeleton';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { databases, Query, ID, client,DATABASE_ID,USERS_ID,CHALLENGES_ID,JOINED_CHALLENGES_ID,FRIENDS_ID,FRIEND_REQUESTS_ID } from '~/appwrite/config';
+import { databases, Query, ID, client, DATABASE_ID, USERS_ID, CHALLENGES_ID, JOINED_CHALLENGES_ID, FRIENDS_ID, FRIEND_REQUESTS_ID, DEFAULT_IMG } from '~/appwrite/config';
 import { UserContext } from '~/contexts/UserContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faChevronDown } from '@fortawesome/free-solid-svg-icons';
-
 
 function ProfileUser() {
     const { id } = useParams();
@@ -25,7 +24,6 @@ function ProfileUser() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const unsubscribeRef = useRef(null);
 
-    // Memoized fetchUserData để tránh tạo lại hàm không cần thiết
     const fetchUserData = useMemo(() => {
         return async (isInitial = false) => {
             if (isInitial) setInitialLoading(true);
@@ -40,12 +38,8 @@ function ProfileUser() {
                     friendRelation,
                 ] = await Promise.all([
                     databases.getDocument(DATABASE_ID, USERS_ID, id),
-                    databases.listDocuments(DATABASE_ID, CHALLENGES_ID, [
-                        Query.equal('idUserCreated', id),
-                    ]),
-                    databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [
-                        Query.equal('idUserJoined', id),
-                    ]),
+                    databases.listDocuments(DATABASE_ID, CHALLENGES_ID, [Query.equal('idUserCreated', id)]),
+                    databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [Query.equal('idUserJoined', id)]),
                     databases.listDocuments(DATABASE_ID, FRIEND_REQUESTS_ID, [
                         Query.equal('receiverId', id),
                         Query.equal('status', 'pending'),
@@ -72,19 +66,15 @@ function ProfileUser() {
                 setCreatedChallenges(createdResponse.documents);
                 setFriendRequests(friendRequestsResponse.documents);
 
-                // Tối ưu hóa lấy dữ liệu joined challenges
                 const joinedChallengesData = await Promise.all(
                     joinedResponse.documents.map(async ({ challengeId, videoURL, describe }) => ({
-                        ...(await databases
-                            .getDocument(DATABASE_ID, CHALLENGES_ID, challengeId)
-                            .catch(() => null)),
+                        ...(await databases.getDocument(DATABASE_ID, CHALLENGES_ID, challengeId).catch(() => null)),
                         userVideo: videoURL,
                         userDescribe: describe,
                     })),
                 );
                 setJoinedChallenges(joinedChallengesData.filter(Boolean));
 
-                // Xác định trạng thái bạn bè một cách hiệu quả
                 const relationDoc = friendRelation.documents[0];
                 const sentReq = pendingSentRequest.documents[0];
                 const receivedReq = pendingReceivedRequest.documents[0];
@@ -99,18 +89,14 @@ function ProfileUser() {
         };
     }, [id, userId]);
 
-    // Subscription chỉ chạy khi cần
     useEffect(() => {
         if (!userId) return;
-        fetchUserData(true); // Tải lần đầu
+        fetchUserData(true);
         const unsubscribe = client.subscribe(
-            [
-                `databases.${DATABASE_ID}.collections.${FRIEND_REQUESTS_ID}.documents`,
-                `databases.${DATABASE_ID}.collections.${FRIENDS_ID}.documents`,
-            ],
+            [`databases.${DATABASE_ID}.collections.${FRIEND_REQUESTS_ID}.documents`, `databases.${DATABASE_ID}.collections.${FRIENDS_ID}.documents`],
             (response) => {
                 if (response.events.some((event) => event.includes('documents'))) {
-                    fetchUserData(false); // Cập nhật không loading
+                    fetchUserData(false);
                 }
             },
         );
@@ -118,22 +104,11 @@ function ProfileUser() {
         return () => unsubscribeRef.current?.();
     }, [fetchUserData, userId]);
 
-    // Memoized handlers để tránh tạo lại hàm
     const handleAddFriend = useCallback(async () => {
         if (friendStatus) return;
-        const requestData = {
-            senderId: userId,
-            receiverId: id,
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-        };
+        const requestData = { senderId: userId, receiverId: id, status: 'pending', createdAt: new Date().toISOString() };
         try {
-            const response = await databases.createDocument(
-                DATABASE_ID,
-                FRIEND_REQUESTS_ID,
-                ID.unique(),
-                requestData,
-            );
+            const response = await databases.createDocument(DATABASE_ID, FRIEND_REQUESTS_ID, ID.unique(), requestData);
             setFriendStatus('pending');
             setPendingRequest({ ...requestData, $id: response.$id });
             alert('Đã gửi yêu cầu kết bạn!');
@@ -166,9 +141,7 @@ function ProfileUser() {
                     Query.and([Query.equal('userId', id), Query.equal('friendId', userId)]),
                 ]),
             ]);
-            await Promise.all(
-                relations.documents.map((doc) => databases.deleteDocument(DATABASE_ID, FRIENDS_ID, doc.$id)),
-            );
+            await Promise.all(relations.documents.map((doc) => databases.deleteDocument(DATABASE_ID, FRIENDS_ID, doc.$id)));
             setFriendStatus(null);
             alert('Đã hủy kết bạn thành công!');
         } catch (error) {
@@ -217,44 +190,38 @@ function ProfileUser() {
         }
     }, [pendingRequest]);
 
-    // Memoized các giá trị thường xuyên sử dụng
     const isSelfProfile = useMemo(() => userId === id, [userId, id]);
     const friendButtonText = useMemo(
-        () =>
-            ({
-                accepted: 'Hủy kết bạn',
-                pending: 'Hủy yêu cầu',
-                null: 'Kết bạn',
-            }[friendStatus] || ''),
+        () => ({
+            accepted: 'Hủy kết bạn',
+            pending: 'Hủy yêu cầu',
+            null: 'Kết bạn',
+        }[friendStatus] || ''),
         [friendStatus],
     );
 
     if (initialLoading) {
         return (
-            <div className="container mx-auto mt-8 mb-[90px] p-6 bg-white rounded-lg shadow">
-                <div className="flex items-center">
-                    <Skeleton circle height={100} width={100} />
-                    <Skeleton width={180} height={30} className="ml-4" />
+            <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                    <Skeleton circle height={80} width={80} />
+                    <Skeleton width={180} height={30} />
                 </div>
-                <div className="mt-10">
+                <div className="mt-6">
                     <Skeleton width={152} height={23} />
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                        {Array(3)
-                            .fill()
-                            .map((_, i) => (
-                                <Skeleton key={i} width={402} height={69} />
-                            ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                        {Array(3).fill().map((_, i) => (
+                            <Skeleton key={i} height={69} />
+                        ))}
                     </div>
                 </div>
-                <div className="mt-10">
+                <div className="mt-6">
                     <Skeleton width={173} height={23} />
                     <Skeleton width={100} height={18} />
                     <div className="mt-2 space-y-2">
-                        {Array(4)
-                            .fill()
-                            .map((_, i) => (
-                                <Skeleton key={i} height={69} />
-                            ))}
+                        {Array(4).fill().map((_, i) => (
+                            <Skeleton key={i} height={69} />
+                        ))}
                     </div>
                 </div>
             </div>
@@ -262,31 +229,26 @@ function ProfileUser() {
     }
 
     return (
-        <div className="container mx-auto mt-8 mb-[90px] p-6 bg-white rounded-lg shadow">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center">
+        <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
                     <img
-                        width={100}
-                        height={100}
-                        className="rounded-full"
-                        src={userData.imgUser}
+                        width={80}
+                        height={80}
+                        className="rounded-full shadow-md w-20 h-20 sm:w-24 sm:h-24 object-cover"
+                        src={userData.imgUser || DEFAULT_IMG}
                         alt="Avatar"
+                        loading="lazy"
                     />
-                    <h1 className="text-5xl font-bold ml-4">{userData.displayName}</h1>
+                    <h1 className="text-3xl sm:text-5xl font-bold">{userData.displayName}</h1>
                 </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => navigate(`/chat?user=${userData.$id}`)}
-                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                        Nhắn tin
-                    </button>
+                <div className="flex flex-col sm:flex-row gap-2">
                     {!isSelfProfile &&
                         (friendStatus === 'received' ? (
                             <div className="relative">
                                 <button
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center"
+                                    className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded hover:bg-yellow-600 transition-colors flex items-center"
                                 >
                                     Phản hồi
                                     <FontAwesomeIcon icon={faChevronDown} className="ml-2" />
@@ -317,7 +279,7 @@ function ProfileUser() {
                                         ? handleUnfriend
                                         : handleAddFriend
                                 }
-                                className={`px-4 py-2 rounded-lg transition-colors ${
+                                className={`font-semibold py-2 px-4 rounded transition-colors ${
                                     friendStatus === 'accepted'
                                         ? 'bg-red-500 text-white hover:bg-red-600'
                                         : friendStatus === 'pending'
@@ -331,69 +293,76 @@ function ProfileUser() {
                     {isSelfProfile && friendRequests.length > 0 && (
                         <button
                             onClick={() => setShowRequestsModal(true)}
-                            className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors"
+                            className="bg-purple-500 text-white font-semibold py-2 px-4 rounded hover:bg-purple-600 transition-colors"
                         >
                             Xem yêu cầu kết bạn ({friendRequests.length})
                         </button>
                     )}
+                    <button
+                        onClick={() => navigate(`/chat?user=${userData.$id}`)}
+                        className="bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+                    >
+                        Nhắn tin
+                    </button>
                 </div>
-                {showRequestsModal && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                        <div className="bg-white p-5 rounded-lg shadow-lg w-96">
-                            <div className="flex justify-between items-center border-b pb-2">
-                                <h3 className="text-xl font-bold">Yêu cầu kết bạn</h3>
-                                <button
-                                    onClick={() => setShowRequestsModal(false)}
-                                    className="text-gray-500 hover:text-gray-800"
-                                >
-                                    <FontAwesomeIcon icon={faTimes} />
-                                </button>
-                            </div>
-                            <ul className="mt-4 space-y-2">
-                                {friendRequests.map((request) => (
-                                    <li key={request.$id} className="flex justify-between items-center">
-                                        <span>{request.senderId} muốn kết bạn với bạn</span>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={handleAcceptFriend}
-                                                className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                                            >
-                                                Chấp nhận
-                                            </button>
-                                            <button
-                                                onClick={handleRejectFriend}
-                                                className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                                            >
-                                                Từ chối
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                )}
             </div>
 
-            <div className="mt-10">
-                <h2 className="text-3xl font-semibold">Thông tin cá nhân</h2>
-                <div className="grid grid-cols-3 gap-4 mt-4">
+            {showRequestsModal && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white p-4 sm:p-5 rounded-lg shadow-lg w-full max-w-md">
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <h3 className="text-lg sm:text-xl font-bold">Yêu cầu kết bạn</h3>
+                            <button
+                                onClick={() => setShowRequestsModal(false)}
+                                className="text-gray-500 hover:text-gray-800"
+                            >
+                                <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                        </div>
+                        <ul className="mt-4 space-y-2">
+                            {friendRequests.map((request) => (
+                                <li key={request.$id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                    <span className="text-sm sm:text-base">{request.senderId} muốn kết bạn với bạn</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleAcceptFriend}
+                                            className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 text-sm"
+                                        >
+                                            Chấp nhận
+                                        </button>
+                                        <button
+                                            onClick={handleRejectFriend}
+                                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
+                                        >
+                                            Từ chối
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
+
+            <div className="mt-8">
+                <h2 className="text-2xl sm:text-3xl font-semibold">Thông tin cá nhân</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                     <div className="bg-gray-100 p-4 rounded-lg text-center">
-                        <h3 className="font-bold">Thử thách đã tạo:</h3>
-                        <p className="text-2xl">{createdChallenges.length}</p>
+                        <h3 className="font-bold text-sm sm:text-base">Thử thách đã tạo:</h3>
+                        <p className="text-xl sm:text-2xl">{createdChallenges.length}</p>
                     </div>
                     <div className="bg-gray-100 p-4 rounded-lg text-center">
-                        <h3 className="font-bold">Thử thách đã tham gia:</h3>
-                        <p className="text-2xl">{joinedChallenges.length}</p>
+                        <h3 className="font-bold text-sm sm:text-base">Thử thách đã tham gia:</h3>
+                        <p className="text-xl sm:text-2xl">{joinedChallenges.length}</p>
                     </div>
                     <div className="bg-gray-100 p-4 rounded-lg text-center">
-                        <h3 className="font-bold">Điểm:</h3>
-                        <p className="text-2xl">{userData.points || 0} điểm</p>
+                        <h3 className="font-bold text-sm sm:text-base">Điểm:</h3>
+                        <p className="text-xl sm:text-2xl">{userData.points || 0} điểm</p>
                     </div>
                 </div>
 
-                <h2 className="text-3xl mt-5 font-semibold">Danh sách thử thách</h2>
-                <h3 className="text-xl mt-4 font-bold">Thử thách đã tạo:</h3>
+                <h2 className="text-2xl sm:text-3xl mt-6 font-semibold">Danh sách thử thách</h2>
+                <h3 className="text-lg sm:text-xl mt-4 font-bold">Thử thách đã tạo:</h3>
                 {createdChallenges.length ? (
                     <div>
                         <ul className="mt-2 space-y-2">
@@ -401,47 +370,57 @@ function ProfileUser() {
                                 <Link
                                     to={`/challenge/${challenge.$id}`}
                                     key={challenge.$id}
-                                    className="flex items-center justify-between bg-white p-3 rounded-lg shadow hover:bg-gray-50 transition-colors"
+                                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-3 rounded-lg shadow hover:bg-gray-50 transition-colors"
                                 >
-                                    <div>
-                                        <p className="font-bold">{challenge.nameChallenge}</p>
-                                        <p className="text-sm text-gray-500">{challenge.field}</p>
-                                        <p className="text-sm text-blue-500">
-                                            {challenge.participants > 0
-                                                ? `${challenge.participants} người tham gia`
-                                                : 'Chưa có người tham gia'}
-                                        </p>
+                                    <div className="flex items-center gap-4">
+                                        {challenge.imgChallenge && (
+                                            <img
+                                                src={challenge.imgChallenge}
+                                                alt={challenge.nameChallenge}
+                                                className="w-16 h-16 object-cover rounded-lg"
+                                                loading="lazy"
+                                            />
+                                        )}
+                                        <div>
+                                            <p className="font-bold text-sm sm:text-base">{challenge.nameChallenge}</p>
+                                            <p className="text-sm text-gray-500">{challenge.field}</p>
+                                            <p className="text-sm text-blue-500">
+                                                {challenge.participants > 0
+                                                    ? `${challenge.participants} người tham gia`
+                                                    : 'Chưa có người tham gia'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </Link>
                             ))}
                         </ul>
-                        {visibleCreatedChallenges < createdChallenges.length && (
-                            <button
-                                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                onClick={() => setVisibleCreatedChallenges((prev) => prev + 5)}
-                            >
-                                Xem thêm
-                            </button>
-                        )}
-                        {visibleCreatedChallenges > 5 && createdChallenges.length > 5 && (
-                            <button
-                                className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
-                                onClick={() => setVisibleCreatedChallenges(5)}
-                            >
-                                Ẩn bớt
-                            </button>
-                        )}
+                        <div className="flex gap-2 mt-4">
+                            {visibleCreatedChallenges < createdChallenges.length && (
+                                <button
+                                    className="bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600 transition-colors text-sm sm:text-base"
+                                    onClick={() => setVisibleCreatedChallenges((prev) => prev + 5)}
+                                >
+                                    Xem thêm
+                                </button>
+                            )}
+                            {visibleCreatedChallenges > 5 && createdChallenges.length > 5 && (
+                                <button
+                                    className="bg-gray-500 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600 transition-colors text-sm sm:text-base"
+                                    onClick={() => setVisibleCreatedChallenges(5)}
+                                >
+                                    Ẩn bớt
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ) : (
-                    <p className="mt-2 text-gray-500">Người dùng chưa tạo thử thách nào.</p>
+                    <p className="mt-2 text-gray-500 text-sm sm:text-base">Người dùng chưa tạo thử thách nào.</p>
                 )}
-            </div>
 
-            <div className="mt-10">
-                <h3 className="text-xl mt-4 font-bold">Thử thách đã tham gia:</h3>
+                <h3 className="text-lg sm:text-xl mt-6 font-bold">Thử thách đã tham gia:</h3>
                 {joinedChallenges.length ? (
                     <div>
-                        <ul className="grid grid-cols-3 gap-4 mt-2">
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
                             {joinedChallenges.slice(0, visibleJoinedChallenges).map((challenge) => (
                                 <Link
                                     to={`/challenge/${challenge.$id}`}
@@ -449,39 +428,49 @@ function ProfileUser() {
                                     className="flex flex-col bg-white p-4 rounded-lg shadow hover:bg-gray-50 transition-colors"
                                 >
                                     <div>
-                                        <p className="font-bold text-xl">{challenge.nameChallenge}</p>
+                                        {challenge.imgChallenge && (
+                                            <img
+                                                src={challenge.imgChallenge}
+                                                alt={challenge.nameChallenge}
+                                                className="w-full h-48 object-cover rounded-lg mb-2"
+                                                loading="lazy"
+                                            />
+                                        )}
+                                        <p className="font-bold text-sm sm:text-lg">{challenge.nameChallenge}</p>
                                         <p className="text-sm text-gray-500">{challenge.field}</p>
                                         <p className="text-sm text-blue-500">{challenge.participants} người tham gia</p>
                                         <video
                                             src={challenge.userVideo}
                                             loading="lazy"
                                             controls
-                                            className="w-full h-[200px] mt-2 rounded-lg"
+                                            className="w-full h-48 mt-2 rounded-lg object-cover"
                                         />
-                                        <p className="text-gray-600 mt-2">Mô tả: {challenge.userDescribe}</p>
+                                        <p className="text-gray-600 mt-2 text-sm sm:text-base">Mô tả: {challenge.userDescribe}</p>
                                     </div>
                                 </Link>
                             ))}
                         </ul>
-                        {visibleJoinedChallenges < joinedChallenges.length && (
-                            <button
-                                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                onClick={() => setVisibleJoinedChallenges((prev) => prev + 3)}
-                            >
-                                Xem thêm
-                            </button>
-                        )}
-                        {visibleJoinedChallenges > 3 && joinedChallenges.length > 3 && (
-                            <button
-                                className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
-                                onClick={() => setVisibleJoinedChallenges(3)}
-                            >
-                                Ẩn bớt
-                            </button>
-                        )}
+                        <div className="flex gap-2 mt-4">
+                            {visibleJoinedChallenges < joinedChallenges.length && (
+                                <button
+                                    className="bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600 transition-colors text-sm sm:text-base"
+                                    onClick={() => setVisibleJoinedChallenges((prev) => prev + 3)}
+                                >
+                                    Xem thêm
+                                </button>
+                            )}
+                            {visibleJoinedChallenges > 3 && joinedChallenges.length > 3 && (
+                                <button
+                                    className="bg-gray-500 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600 transition-colors text-sm sm:text-base"
+                                    onClick={() => setVisibleJoinedChallenges(3)}
+                                >
+                                    Ẩn bớt
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ) : (
-                    <p className="mt-2 text-gray-500">Người dùng chưa tham gia thử thách nào.</p>
+                    <p className="mt-2 text-gray-500 text-sm sm:text-base">Người dùng chưa tham gia thử thách nào.</p>
                 )}
             </div>
         </div>

@@ -31,12 +31,13 @@ const Profile = () => {
     const [joinedChallenges, setJoinedChallenges] = useState([]);
     const [isEditing, setIsEditing] = useState(false);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false); // Thêm trạng thái loading cho lưu thông tin cá nhân
     const [formData, setFormData] = useState({
         displayName: '',
         imgUserFile: null,
         newPassword: '',
         confirmPassword: '',
-        currentPassword: '', // Thêm currentPassword vào formData
+        currentPassword: '',
     });
     const [imgUserPreview, setImgUserPreview] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
@@ -50,6 +51,7 @@ const Profile = () => {
         describe: '',
         imgChallenge: null,
     });
+    const [challengeImgPreview, setChallengeImgPreview] = useState(''); // Thêm trạng thái xem trước ảnh thử thách
     const fields = useMemo(
         () => [
             'Thể thao',
@@ -119,13 +121,8 @@ const Profile = () => {
         fetchUserData();
     }, [fetchUserData]);
 
-    const handleShowMoreCreatedChallenges = () => {
-        setVisibleCreatedChallenges((prev) => prev + 5);
-    };
-
-    const handleShowMoreJoinedChallenges = () => {
-        setVisibleJoinedChallenges((prev) => prev + 3);
-    };
+    const handleShowMoreCreatedChallenges = () => setVisibleCreatedChallenges((prev) => prev + 5);
+    const handleShowMoreJoinedChallenges = () => setVisibleJoinedChallenges((prev) => prev + 3);
 
     const handleEditChallenge = (challenge) => {
         setEditingChallenge((prev) => (prev && prev.$id === challenge.$id ? null : challenge));
@@ -135,6 +132,7 @@ const Profile = () => {
             describe: challenge.describe,
             imgChallenge: challenge.imgChallenge,
         });
+        setChallengeImgPreview(challenge.imgChallenge); // Hiển thị ảnh hiện tại khi chỉnh sửa
     };
 
     const handleChallengeInputChange = (e) => {
@@ -146,37 +144,67 @@ const Profile = () => {
         const file = e.target.files[0];
         if (file) {
             setChallengeForm((prev) => ({ ...prev, imgChallenge: file }));
+            setChallengeImgPreview(URL.createObjectURL(file)); // Xem trước ảnh mới
         }
     };
 
     const handleSaveChallengeChanges = async () => {
         if (!editingChallenge) return;
-
+    
         setIsSavingChallenge(true);
         try {
             let imgChallengeUrl = editingChallenge.imgChallenge;
-
-            // Nếu có ảnh mới thì tải lên
+            let fileImgId = editingChallenge.fileImgId; // Giả sử bạn thêm trường fileImgId để lưu ID file
+    
+            // Kiểm tra và xử lý ảnh mới nếu có
             if (challengeForm.imgChallenge instanceof File) {
-                const fileResponse = await storage.createFile(BUCKET_ID, ID.unique(), challengeForm.imgChallenge);
-                imgChallengeUrl = storage.getFileView(BUCKET_ID, fileResponse.$id).href; // Sử dụng $id từ fileResponse
+                try {
+                    // Upload ảnh mới trước
+                    const fileResponse = await storage.createFile(BUCKET_ID, ID.unique(), challengeForm.imgChallenge);
+                    imgChallengeUrl = storage.getFileView(BUCKET_ID, fileResponse.$id);
+                    fileImgId = fileResponse.$id;
+    
+                    // Xóa ảnh cũ nếu có sau khi upload thành công
+                    if (editingChallenge.fileImgId) {
+                        try {
+                            await storage.deleteFile(BUCKET_ID, editingChallenge.fileImgId);
+                        } catch (error) {
+                            console.warn('Không thể xóa ảnh cũ của thử thách:', error);
+                        }
+                    }
+                } catch (uploadError) {
+                    console.error('Lỗi khi upload ảnh thử thách:', uploadError);
+                    alert('Upload ảnh thử thách thất bại, vui lòng thử lại!');
+                    setIsSavingChallenge(false);
+                    return;
+                }
             }
-
-            // Cập nhật dữ liệu thử thách
-            const updatedChallenge = await databases.updateDocument(DATABASE_ID, CHALLENGES_ID, editingChallenge.$id, {
+    
+            // Tạo object chứa thông tin thử thách đã cập nhật
+            const updatedChallenge = {
                 nameChallenge: challengeForm.nameChallenge,
                 field: challengeForm.field,
                 describe: challengeForm.describe,
                 imgChallenge: imgChallengeUrl,
-            });
-
-            // Cập nhật danh sách thử thách
-            setCreatedChallenges((prev) => prev.map((c) => (c.$id === updatedChallenge.$id ? updatedChallenge : c)));
-            setEditingChallenge(null);
-            alert('Cập nhật thử thách thành công!');
+                fileImgId: fileImgId, // Lưu ID file nếu bạn dùng
+            };
+    
+            // Cập nhật document trong database
+            try {
+                const updatedDoc = await databases.updateDocument(DATABASE_ID, CHALLENGES_ID, editingChallenge.$id, updatedChallenge);
+                setCreatedChallenges((prev) =>
+                    prev.map((c) => (c.$id === updatedDoc.$id ? updatedDoc : c))
+                );
+                setEditingChallenge(null);
+                setChallengeImgPreview(''); // Reset xem trước
+                alert('Cập nhật thử thách thành công!');
+            } catch (updateError) {
+                console.error('Lỗi khi cập nhật thông tin thử thách:', updateError);
+                alert('Cập nhật thông tin thử thách thất bại, vui lòng thử lại!');
+            }
         } catch (error) {
-            console.error('Lỗi khi cập nhật thử thách:', error);
-            alert('Cập nhật thử thách thất bại!');
+            console.error('Lỗi không xác định khi cập nhật thử thách:', error);
+            alert('Đã xảy ra lỗi khi cập nhật thử thách, vui lòng thử lại!');
         } finally {
             setIsSavingChallenge(false);
         }
@@ -192,9 +220,7 @@ const Profile = () => {
             alert('Không tìm thấy thử thách để xóa.');
             return;
         }
-        const confirmDelete = window.confirm(
-            'Bạn có chắc chắn muốn xóa thử thách này không? Hành động này không thể hoàn tác!',
-        );
+        const confirmDelete = window.confirm('Bạn có chắc chắn muốn xóa thử thách này không?');
         if (!confirmDelete) return;
 
         try {
@@ -232,11 +258,10 @@ const Profile = () => {
 
     const handleSaveChanges = async () => {
         setErrorMessage('');
-
         if (!window.confirm('Bạn có chắc chắn muốn lưu những thay đổi này không?')) return;
-
         if (!validatePassword()) return;
 
+        setIsSavingProfile(true); // Bật trạng thái loading
         try {
             const accountInfo = await account.get();
             if (!accountInfo) {
@@ -248,7 +273,7 @@ const Profile = () => {
 
             if (formData.imgUserFile) {
                 const fileResponse = await storage.createFile(BUCKET_ID, ID.unique(), formData.imgUserFile);
-                imgUserUrl = storage.getFileView(BUCKET_ID, fileResponse.$id).href;
+                imgUserUrl = storage.getFileView(BUCKET_ID, fileResponse.$id);
             }
 
             await Promise.all([
@@ -297,6 +322,8 @@ const Profile = () => {
         } catch (error) {
             console.error('Lỗi khi cập nhật thông tin:', error);
             setErrorMessage(error.message || 'Đã xảy ra lỗi khi cập nhật thông tin. Vui lòng thử lại.');
+        } finally {
+            setIsSavingProfile(false); // Tắt trạng thái loading
         }
     };
 
@@ -389,30 +416,29 @@ const Profile = () => {
 
     if (loading) {
         return (
-            <div className="relative container mx-auto mt-8 mb-[90px] p-6 bg-white rounded-lg shadow">
-                <div className="mt-6 flex justify-end absolute gap-2 top-14 right-3">
-                    <Skeleton width={102} height={34} className="py-2 px-4 rounded" />
-                    <Skeleton width={46} height={34} className="py-2 px-4 rounded" />
+            <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 mb-4">
+                    <Skeleton width={102} height={34} />
+                    <Skeleton width={46} height={34} />
                 </div>
-                <div className="flex items-center">
-                    <Skeleton circle={true} height={100} width={100} />
-                    <Skeleton width={180} height={30} className="ml-4" />
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <Skeleton circle={true} height={80} width={80} />
+                    <Skeleton width={180} height={30} />
                 </div>
-                <div className="mt-10">
+                <div className="mt-6">
                     <Skeleton width={152} height={23} />
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                        <Skeleton className="p-4" width={402} height={69} />
-                        <Skeleton className="p-4" width={402} height={69} />
-                        <Skeleton className="p-4" width={402} height={69} />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                        <Skeleton height={69} />
+                        <Skeleton height={69} />
+                        <Skeleton height={69} />
                     </div>
                 </div>
-                <div className="mt-10">
+                <div className="mt-6">
                     <Skeleton width={100} height={18} />
                     <div className="mt-2 space-y-2">
-                        <Skeleton className="p-3 mb-2" height={69} />
-                        <Skeleton className="p-3 mb-2" height={69} />
-                        <Skeleton className="p-3 mb-2" height={69} />
-                        <Skeleton className="p-3 mb-2" height={69} />
+                        <Skeleton height={69} />
+                        <Skeleton height={69} />
+                        <Skeleton height={69} />
                     </div>
                 </div>
             </div>
@@ -420,10 +446,10 @@ const Profile = () => {
     }
 
     return (
-        <div className="relative container mx-auto mt-8 mb-[90px] p-6 bg-white rounded-lg shadow">
-            <div className="mt-6 flex justify-end absolute gap-2 top-14 right-3">
+        <div className="container mx-auto mt-8 mb-32 p-4 sm:p-6 bg-white rounded-lg shadow relative">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 absolute top-4 right-4">
                 <button
-                    className="bg-blue-500 text-white font-semibold py-2 px-4 rounded"
+                    className="bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600"
                     onClick={() => {
                         setIsEditing(true);
                         setFormData((prev) => ({ ...prev, displayName: userData.displayName }));
@@ -432,95 +458,140 @@ const Profile = () => {
                     Sửa hồ sơ
                 </button>
                 <Tippy content="Đăng xuất">
-                    <button className="bg-red-500 text-white font-semibold py-2 px-4 rounded" onClick={handleLogout}>
+                    <button
+                        className="bg-red-500 text-white font-semibold py-2 px-4 rounded hover:bg-red-600"
+                        onClick={handleLogout}
+                    >
                         <FontAwesomeIcon icon={faRightFromBracket} />
                     </button>
                 </Tippy>
             </div>
-            <div className="flex items-center">
+
+            <div className="flex flex-col sm:flex-row items-center gap-4">
                 <img
                     src={imgUserPreview}
-                    alt="imgUser"
-                    width={100}
-                    height={100}
+                    alt="User Avatar"
+                    width={80}
+                    height={80}
                     loading="lazy"
-                    className="rounded-full shadow-md"
+                    className="rounded-full shadow-md w-20 h-20 sm:w-24 sm:h-24 object-cover"
                 />
-                <h1 className="text-5xl font-bold ml-4">{userData.displayName}</h1>
+                <h1 className="text-3xl sm:text-5xl font-bold">{userData.displayName}</h1>
             </div>
 
             {isEditing ? (
                 <div className="mt-6">
-                    <h2 className="text-2xl font-semibold">Chỉnh sửa thông tin</h2>
+                    <h2 className="text-xl sm:text-2xl font-semibold">Chỉnh sửa thông tin</h2>
                     <div className="mt-4 space-y-4">
-                        <div className="flex">
-                            <label className="text-xl w-[80px] leading-[40px]">Tên hiển thị:</label>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                            <label className="text-lg font-medium w-full sm:w-24">Tên hiển thị:</label>
                             <input
                                 name="displayName"
                                 value={formData.displayName}
                                 onChange={handleInputChange}
                                 placeholder="Tên hiển thị"
-                                className="w-full p-2 border rounded"
+                                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                disabled={isSavingProfile}
                             />
                         </div>
-                        <div className="flex">
-                            <label className="text-xl w-[80px] leading-[40px]">Ảnh đại diện:</label>
-                            <input type="file" accept="image/*" onChange={handleFileChange} className="w-full p-2" />
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                            <label className="text-lg font-medium w-full sm:w-24">Ảnh đại diện:</label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                className="w-full p-2"
+                                disabled={isSavingProfile}
+                            />
                         </div>
                         <button
-                            className="bg-blue-500 px-4 py-2 text-white mt-4 rounded"
+                            className="bg-blue-500 px-4 py-2 text-white rounded hover:bg-blue-600"
                             onClick={() => setIsChangingPassword(!isChangingPassword)}
+                            disabled={isSavingProfile}
                         >
                             {isChangingPassword ? 'Ẩn đổi mật khẩu' : 'Thay đổi mật khẩu'}
                         </button>
                         {isChangingPassword && (
-                            <>
-                                <div className="flex">
-                                    <label className="text-xl w-[160px] leading-[40px]">Mật khẩu hiện tại:</label>
+                            <div className="space-y-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                    <label className="text-lg font-medium w-full sm:w-40">Mật khẩu hiện tại:</label>
                                     <input
                                         name="currentPassword"
                                         value={formData.currentPassword}
                                         onChange={handleInputChange}
                                         placeholder="Mật khẩu hiện tại"
-                                        className="w-full p-2 border rounded mt-2"
                                         type="password"
+                                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        disabled={isSavingProfile}
                                     />
                                 </div>
-                                <div className="flex">
-                                    <label className="text-xl w-[160px] leading-[40px]">Mật khẩu mới:</label>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                    <label className="text-lg font-medium w-full sm:w-40">Mật khẩu mới:</label>
                                     <input
                                         name="newPassword"
                                         value={formData.newPassword}
                                         onChange={handleInputChange}
                                         placeholder="Mật khẩu mới"
-                                        className="w-full p-2 border rounded mt-2"
                                         type="password"
+                                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        disabled={isSavingProfile}
                                     />
                                 </div>
-                                <div className="flex">
-                                    <label className="text-xl w-[160px] leading-[40px]">Xác nhận mật khẩu mới:</label>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                    <label className="text-lg font-medium w-full sm:w-40">Xác nhận mật khẩu:</label>
                                     <input
                                         name="confirmPassword"
                                         value={formData.confirmPassword}
                                         onChange={handleInputChange}
-                                        placeholder="Xác nhận mật khẩu mới"
-                                        className="w-full p-2 border rounded mt-2"
+                                        placeholder="Xác nhận mật khẩu"
                                         type="password"
+                                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        disabled={isSavingProfile}
                                     />
                                 </div>
-                            </>
+                            </div>
                         )}
-                        {errorMessage && <p className="text-red-500 mt-2">{errorMessage}</p>}
-                        <div className="mt-6">
+                        {errorMessage && <p className="text-red-500">{errorMessage}</p>}
+                        <div className="flex gap-2">
                             <button
-                                className="bg-green-500 rounded mr-[10px] px-4 py-2 text-white"
+                                className={`bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 ${
+                                    isSavingProfile ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
                                 onClick={handleSaveChanges}
+                                disabled={isSavingProfile}
                             >
-                                Lưu
+                                {isSavingProfile ? (
+                                    <span className="flex items-center">
+                                        <svg
+                                            className="animate-spin h-5 w-5 mr-2 text-white"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            ></circle>
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                        </svg>
+                                        Đang lưu...
+                                    </span>
+                                ) : (
+                                    'Lưu'
+                                )}
                             </button>
                             <button
-                                className="bg-gray-400 rounded px-4 py-2 text-black"
+                                className="bg-gray-400 text-black px-4 py-2 rounded hover:bg-gray-500"
                                 onClick={() => setIsEditing(false)}
+                                disabled={isSavingProfile}
                             >
                                 Hủy
                             </button>
@@ -528,46 +599,46 @@ const Profile = () => {
                     </div>
                 </div>
             ) : (
-                <div className="mt-10">
-                    <h2 className="text-3xl font-semibold">Thông tin cá nhân</h2>
-                    <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="mt-8">
+                    <h2 className="text-2xl sm:text-3xl font-semibold">Thông tin cá nhân</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                         <div className="bg-gray-100 p-4 rounded-lg text-center">
-                            <h3 className="font-bold">Thử thách đã tạo:</h3>
-                            <p className="text-2xl">{createdChallenges.length || 0}</p>
+                            <h3 className="font-bold">Thử thách đã tạo</h3>
+                            <p className="text-xl sm:text-2xl">{createdChallenges.length || 0}</p>
                         </div>
                         <div className="bg-gray-100 p-4 rounded-lg text-center">
-                            <h3 className="font-bold">Thử thách đã tham gia:</h3>
-                            <p className="text-2xl">{joinedChallenges.length || 0}</p>
+                            <h3 className="font-bold">Thử thách đã tham gia</h3>
+                            <p className="text-xl sm:text-2xl">{joinedChallenges.length || 0}</p>
                         </div>
                         <div className="bg-gray-100 p-4 rounded-lg text-center">
-                            <h3 className="font-bold">Điểm của bạn:</h3>
-                            <p className="text-2xl">{userData.points || 0} điểm</p>
+                            <h3 className="font-bold">Điểm của bạn</h3>
+                            <p className="text-xl sm:text-2xl">{userData.points || 0} điểm</p>
                         </div>
                     </div>
 
-                    <div className="mt-10">
+                    <div className="mt-8">
                         {editingChallenge ? (
                             <div className="mt-6">
-                                <h2 className="text-2xl font-semibold">Chỉnh sửa thử thách</h2>
+                                <h2 className="text-xl sm:text-2xl font-semibold">Chỉnh sửa thử thách</h2>
                                 <div className="mt-4 space-y-4">
-                                    <div className="flex">
-                                        <label className="w-[135px] leading-[40px]">Tên thử thách:</label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                        <label className="text-lg font-medium w-full sm:w-32">Tên thử thách:</label>
                                         <input
                                             name="nameChallenge"
                                             value={challengeForm.nameChallenge}
                                             onChange={handleChallengeInputChange}
                                             placeholder="Tên thử thách"
-                                            className="w-full p-2 border rounded"
+                                            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             disabled={isSavingChallenge}
                                         />
                                     </div>
-                                    <div className="flex">
-                                        <label className="w-[135px] leading-[40px]">Lĩnh vực:</label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                        <label className="text-lg font-medium w-full sm:w-32">Lĩnh vực:</label>
                                         <select
                                             name="field"
                                             value={challengeForm.field}
                                             onChange={handleChallengeInputChange}
-                                            className="w-full p-2 border rounded"
+                                            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             disabled={isSavingChallenge}
                                         >
                                             {fields.map((field) => (
@@ -577,19 +648,19 @@ const Profile = () => {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="flex">
-                                        <label className="w-[135px] leading-[40px]">Mô tả:</label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                        <label className="text-lg font-medium w-full sm:w-32">Mô tả:</label>
                                         <textarea
                                             name="describe"
                                             value={challengeForm.describe}
                                             onChange={handleChallengeInputChange}
                                             placeholder="Mô tả thử thách"
-                                            className="w-full p-2 border rounded"
+                                            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             disabled={isSavingChallenge}
                                         />
                                     </div>
-                                    <div className="flex">
-                                        <label className="w-[135px] leading-[40px]">Hình ảnh:</label>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                        <label className="text-lg font-medium w-full sm:w-32">Hình ảnh:</label>
                                         <input
                                             type="file"
                                             accept="image/*"
@@ -598,36 +669,61 @@ const Profile = () => {
                                             disabled={isSavingChallenge}
                                         />
                                     </div>
-                                    {isSavingChallenge && <p className="text-center text-gray-500">Đang lưu...</p>}
-                                    <button
-                                        className={`bg-green-500 rounded px-4 py-2 text-white mr-2 ${
-                                            isSavingChallenge ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`}
-                                        onClick={handleSaveChallengeChanges}
-                                        disabled={isSavingChallenge}
-                                    >
-                                        {isSavingChallenge ? 'Đang lưu...' : 'Lưu'}
-                                    </button>
-                                    <button
-                                        className="bg-gray-400 rounded px-4 py-2 text-black"
-                                        onClick={() => setEditingChallenge(null)}
-                                        disabled={isSavingChallenge}
-                                    >
-                                        Hủy
-                                    </button>
+                                    {challengeImgPreview && (
+                                        <div className="mt-2">
+                                            <img
+                                                src={challengeImgPreview}
+                                                alt="Challenge Preview"
+                                                className="w-32 h-32 object-cover rounded-lg"
+                                            />
+                                        </div>
+                                    )}
+                                    {isSavingChallenge && <p className="text-gray-500 text-center">Đang lưu...</p>}
+                                    <div className="flex gap-2">
+                                        <button
+                                            className={`bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 ${
+                                                isSavingChallenge ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`}
+                                            onClick={handleSaveChallengeChanges}
+                                            disabled={isSavingChallenge}
+                                        >
+                                            {isSavingChallenge ? 'Đang lưu...' : 'Lưu'}
+                                        </button>
+                                        <button
+                                            className="bg-gray-400 text-black px-4 py-2 rounded hover:bg-gray-500"
+                                            onClick={() => {
+                                                setEditingChallenge(null);
+                                                setChallengeImgPreview('');
+                                            }}
+                                            disabled={isSavingChallenge}
+                                        >
+                                            Hủy
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ) : (
                             <div>
-                                <h3 className="text-xl mt-4 font-bold">Thử thách đã tạo:</h3>
+                                <h3 className="text-lg sm:text-xl font-bold mt-4">Thử thách đã tạo:</h3>
                                 <ul className="mt-2 space-y-2">
                                     {createdChallenges.length > 0 ? (
                                         createdChallenges.slice(0, visibleCreatedChallenges).map((challenge) => (
-                                            <div className="relative" key={challenge.$id}>
+                                            <li
+                                                key={challenge.$id}
+                                                className="relative bg-white p-3 rounded-lg shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+                                            >
                                                 <Link
                                                     to={`/challenge/${challenge.$id}`}
-                                                    className="flex items-center justify-between bg-white p-3 rounded-lg shadow"
+                                                    className="flex items-center gap-4"
                                                 >
+                                                    {challenge.imgChallenge && (
+                                                        <img
+                                                            src={challenge.imgChallenge}
+                                                            alt={challenge.nameChallenge}
+                                                            className="w-16 h-16 object-cover rounded-lg"
+                                                            loading="lazy"
+                                                        />
+                                                    )}
                                                     <div>
                                                         <p className="font-bold">{challenge.nameChallenge}</p>
                                                         <p className="text-sm text-gray-500">{challenge.field}</p>
@@ -638,19 +734,21 @@ const Profile = () => {
                                                         </p>
                                                     </div>
                                                 </Link>
-                                                <button
-                                                    className="absolute top-8 right-24 bg-yellow-500 text-white px-3 py-1 rounded"
-                                                    onClick={() => handleEditChallenge(challenge)}
-                                                >
-                                                    {editingChallenge?.$id === challenge.$id ? 'Đóng' : 'Sửa'}
-                                                </button>
-                                                <button
-                                                    className="absolute top-8 right-3 bg-red-500 text-white px-3 py-1 rounded"
-                                                    onClick={() => handleDeleteChallenge(challenge.$id)}
-                                                >
-                                                    Xóa
-                                                </button>
-                                            </div>
+                                                <div className="flex gap-2 mt-2 sm:mt-0">
+                                                    <button
+                                                        className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                                                        onClick={() => handleEditChallenge(challenge)}
+                                                    >
+                                                        {editingChallenge?.$id === challenge.$id ? 'Đóng' : 'Sửa'}
+                                                    </button>
+                                                    <button
+                                                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                                                        onClick={() => handleDeleteChallenge(challenge.$id)}
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                </div>
+                                            </li>
                                         ))
                                     ) : (
                                         <p>Không có thử thách nào được tạo.</p>
@@ -658,7 +756,7 @@ const Profile = () => {
                                 </ul>
                                 {visibleCreatedChallenges < createdChallenges.length && (
                                     <button
-                                        className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+                                        className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                                         onClick={handleShowMoreCreatedChallenges}
                                     >
                                         Xem thêm
@@ -667,37 +765,32 @@ const Profile = () => {
                             </div>
                         )}
 
-                        <h3 className="text-xl mt-4 font-bold">Thử thách đã tham gia:</h3>
-                        <ul className="grid grid-cols-3 gap-4 mt-2">
+                        <h3 className="text-lg sm:text-xl font-bold mt-6">Thử thách đã tham gia:</h3>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
                             {joinedChallenges.length > 0 ? (
                                 joinedChallenges.slice(0, visibleJoinedChallenges).map((challenge) => (
-                                    <div key={challenge.$id} className="relative">
+                                    <li key={challenge.$id} className="relative bg-white p-4 rounded-lg shadow">
                                         <button
-                                            className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded"
+                                            className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
                                             onClick={() => handleLeaveChallenge(challenge)}
                                         >
                                             Rời khỏi
                                         </button>
-                                        <Link
-                                            to={`/challenge/${challenge.$id}`}
-                                            className="flex items-center justify-between bg-white p-4 rounded-lg shadow"
-                                        >
-                                            <div>
-                                                <p className="font-bold">{challenge.nameChallenge}</p>
-                                                <p className="text-sm text-gray-500">{challenge.field}</p>
-                                                <p className="text-sm text-blue-500">
-                                                    {challenge.participants} người tham gia
-                                                </p>
-                                                <video
-                                                    src={challenge.userVideo}
-                                                    controls
-                                                    className="w-[300px] h-[200px] mt-2 rounded-lg"
-                                                    loading="lazy"
-                                                />
-                                                <p className="text-gray-600 mt-2">Mô tả: {challenge.userDescribe}</p>
-                                            </div>
+                                        <Link to={`/challenge/${challenge.$id}`} className="block">
+                                            <p className="font-bold">{challenge.nameChallenge}</p>
+                                            <p className="text-sm text-gray-500">{challenge.field}</p>
+                                            <p className="text-sm text-blue-500">
+                                                {challenge.participants} người tham gia
+                                            </p>
+                                            <video
+                                                src={challenge.userVideo}
+                                                controls
+                                                className="w-full h-48 mt-2 rounded-lg object-cover"
+                                                loading="lazy"
+                                            />
+                                            <p className="text-gray-600 mt-2">Mô tả: {challenge.userDescribe}</p>
                                         </Link>
-                                    </div>
+                                    </li>
                                 ))
                             ) : (
                                 <p>Không có thử thách nào được tham gia.</p>
@@ -705,7 +798,7 @@ const Profile = () => {
                         </ul>
                         {visibleJoinedChallenges < joinedChallenges.length && (
                             <button
-                                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+                                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                                 onClick={handleShowMoreJoinedChallenges}
                             >
                                 Xem thêm
