@@ -202,7 +202,7 @@ function ProfileUser() {
 
     if (initialLoading) {
         return (
-            <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+            <div className="container mx-auto mt-8 mb-32 p-4 sm:p-6 bg-white rounded-lg shadow">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                     <Skeleton circle height={80} width={80} />
                     <Skeleton width={180} height={30} />
@@ -229,7 +229,7 @@ function ProfileUser() {
     }
 
     return (
-        <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+        <div className="container mx-auto mt-8 mb-32 p-4 sm:p-6 bg-white rounded-lg shadow">
             <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                     <img

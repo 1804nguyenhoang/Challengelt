@@ -416,7 +416,7 @@ const Profile = () => {
 
     if (loading) {
         return (
-            <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+            <div className="container mx-auto mt-8 mb-32 p-4 sm:p-6 bg-white rounded-lg shadow">
                 <div className="flex flex-col sm:flex-row justify-end gap-2 mb-4">
                     <Skeleton width={102} height={34} />
                     <Skeleton width={46} height={34} />
