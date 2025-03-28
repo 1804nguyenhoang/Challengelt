@@ -255,9 +255,9 @@ function Explore() {
                             {isSmallScreen ? <></> : <h3 className={cx('font-bold', 'explore')}>Khám phá</h3>}
 
                             <div className="absolute right-0">
-                                <FontAwesomeIcon icon={faFilter} className="absolute left-2 top-3 text-gray-500" />
+                                <FontAwesomeIcon icon={faFilter} className="absolute left-2 top-4 text-gray-500 text-xl" />
                                 <select
-                                    className="pl-8 pr-4 py-2 border rounded-lg bg-white shadow"
+                                    className="cursor-pointer pl-9 pr-4 py-2 border rounded-lg bg-white shadow"
                                     value={selectedField}
                                     onChange={(e) => {
                                         setSelectedField(e.target.value);

@@ -8,9 +8,9 @@ import Skeleton from 'react-loading-skeleton';
 function SearchResult() {
     const [searchParams] = useSearchParams();
     const query = searchParams.get('query');
-    const [activeTab, setActiveTab] = useState('challenge'); // Mặc định chọn "Thử thách"
+    const [activeTab, setActiveTab] = useState('challenge');
     const [searchResults, setSearchResults] = useState([]);
-    const [loading, setLoading] = useState(true); // Bật loading khi vào trang
+    const [loading, setLoading] = useState(true);
 
     const fetchResults = useCallback(
         async (type) => {
@@ -49,7 +49,6 @@ function SearchResult() {
                             Query.contains('describe', query),
                         ]);
 
-                        // 🔹 Lấy thông tin thử thách và người dùng song song
                         const challengeMap = new Map();
                         const userMap = new Map();
 
@@ -58,33 +57,23 @@ function SearchResult() {
                                 if (!challengeMap.has(video.challengeId)) {
                                     challengeMap.set(
                                         video.challengeId,
-                                        databases.getDocument(
-                                            DATABASE_ID,
-                                            CHALLENGES_ID,
-                                            video.challengeId,
-                                        ),
+                                        databases.getDocument(DATABASE_ID, CHALLENGES_ID, video.challengeId),
                                     );
                                 }
                                 if (!userMap.has(video.idUserJoined)) {
                                     userMap.set(
                                         video.idUserJoined,
-                                        databases.getDocument(
-                                            DATABASE_ID,
-                                            USERS_ID,
-                                            video.idUserJoined,
-                                        ),
+                                        databases.getDocument(DATABASE_ID, USERS_ID, video.idUserJoined),
                                     );
                                 }
                             }),
                         );
 
-                        // 🔹 Chờ tất cả các promise hoàn tất
                         const [challengeResults, userResults] = await Promise.all([
                             Promise.all([...challengeMap.values()]),
                             Promise.all([...userMap.values()]),
                         ]);
 
-                        // 🔹 Cập nhật Map với dữ liệu thực tế
                         challengeResults.forEach((challenge) => challengeMap.set(challenge.$id, challenge));
                         userResults.forEach((user) => userMap.set(user.$id, user));
 
@@ -121,14 +110,14 @@ function SearchResult() {
     }, [query, fetchResults]);
 
     return (
-        <div className="container mx-auto mt-8 mb-32 p-6 bg-white rounded-lg shadow">
-            <h1 className="text-3xl font-bold mb-6">Kết quả tìm kiếm cho: "{query}"</h1>
+        <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-6">Kết quả tìm kiếm cho: "{query}"</h1>
 
             {/* Menu Điều Hướng */}
-            <div className="flex space-x-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
                 <button
-                    className={`px-4 py-2 rounded ${
-                        activeTab === 'challenge' ? 'bg-[#f86666] text-white' : 'bg-gray-200'
+                    className={`px-4 py-2 rounded font-semibold text-sm sm:text-base ${
+                        activeTab === 'challenge' ? 'bg-[#f86666] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                     onClick={() => {
                         setActiveTab('challenge');
@@ -138,8 +127,8 @@ function SearchResult() {
                     Thử thách
                 </button>
                 <button
-                    className={`px-4 py-2 rounded ${
-                        activeTab === 'account' ? 'bg-[#f86666] text-white' : 'bg-gray-200'
+                    className={`px-4 py-2 rounded font-semibold text-sm sm:text-base ${
+                        activeTab === 'account' ? 'bg-[#f86666] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                     onClick={() => {
                         setActiveTab('account');
@@ -149,7 +138,9 @@ function SearchResult() {
                     Người dùng
                 </button>
                 <button
-                    className={`px-4 py-2 rounded ${activeTab === 'video' ? 'bg-[#f86666] text-white' : 'bg-gray-200'}`}
+                    className={`px-4 py-2 rounded font-semibold text-sm sm:text-base ${
+                        activeTab === 'video' ? 'bg-[#f86666] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
                     onClick={() => {
                         setActiveTab('video');
                         fetchResults('video');
@@ -162,82 +153,88 @@ function SearchResult() {
             {/* Hiển thị kết quả theo tab đã chọn */}
             {activeTab === 'challenge' && (
                 <div>
-                    <h2 className="text-xl font-semibold">Thử thách</h2>
+                    <h2 className="text-lg sm:text-xl font-semibold mb-4">Thử thách</h2>
                     {loading ? (
-                        <Skeleton count={9} height={50}></Skeleton>
+                        <Skeleton count={5} height={50} className="mb-2" />
                     ) : searchResults.length > 0 ? (
-                        searchResults.map((result) => <SearchItem key={result.id} data={result.data} />)
+                        <div className="space-y-2">
+                            {searchResults.map((result) => (
+                                <SearchItem key={result.id} data={result.data} />
+                            ))}
+                        </div>
                     ) : (
-                        <p>Không có thử thách nào.</p>
+                        <p className="text-gray-500 text-sm sm:text-base">Không có thử thách nào.</p>
                     )}
                 </div>
             )}
 
             {activeTab === 'account' && (
                 <div>
-                    <h2 className="text-xl font-semibold">Người dùng</h2>
+                    <h2 className="text-lg sm:text-xl font-semibold mb-4">Người dùng</h2>
                     {loading ? (
-                        <Skeleton count={9} height={50}></Skeleton>
+                        <Skeleton count={5} height={50} className="mb-2" />
                     ) : searchResults.length > 0 ? (
-                        searchResults.map((result) => <AccountItem key={result.id} data={result.data} />)
+                        <div className="space-y-2">
+                            {searchResults.map((result) => (
+                                <AccountItem key={result.id} data={result.data} />
+                            ))}
+                        </div>
                     ) : (
-                        <p>Không có tài khoản nào.</p>
+                        <p className="text-gray-500 text-sm sm:text-base">Không có tài khoản nào.</p>
                     )}
                 </div>
             )}
 
             {activeTab === 'video' && (
                 <div>
-                    <h2 className="text-xl font-semibold">Video</h2>
+                    <h2 className="text-lg sm:text-xl font-semibold mb-4">Video</h2>
                     {loading ? (
-                        <div className="grid grid-cols-3 gap-4 mt-3 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {[...Array(3)].map((_, index) => (
                                 <div key={index}>
-                                    <Skeleton className="mb-2" width={135} height={24} />
+                                    <Skeleton height={24} className="mb-2" />
                                     <Skeleton height={175} />
-                                    <Skeleton className="mt-2 mb-3" width={250} height={13} />
-                                    <Skeleton className="mt-2 mb-3" width={200} height={13} />
-                                    <div className="flex">
-                                        <Skeleton className="w-12 h-12 rounded-full" />
-                                        <Skeleton className="ml-2" width={120} height={30} />
+                                    <Skeleton height={13} className="mt-2 mb-3" />
+                                    <div className="flex items-center gap-2">
+                                        <Skeleton circle width={40} height={40} />
+                                        <Skeleton width={100} height={20} />
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : searchResults.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {searchResults.map((result) => (
                                 <div key={result.id} className="p-4 bg-gray-100 rounded-lg shadow">
                                     <Link to={`/challenge/${result.data.challengeId}`}>
-                                        <p className="text-blue-600 font-semibold mb-2">
+                                        <p className="text-blue-600 font-semibold mb-2 text-sm sm:text-base">
                                             {result.data.challengeName || 'Không có dữ liệu'}
                                         </p>
                                     </Link>
                                     <video
                                         src={result.data.videoURL}
                                         controls
-                                        className="w-full h-[175px] rounded-lg"
-                                    ></video>
-                                    <p className="font-semibold mt-2">Mô tả: {result.data.describe}</p>
+                                        className="w-full h-40 sm:h-48 rounded-lg object-cover"
+                                        loading="lazy"
+                                    />
+                                    <p className="mt-2 text-sm sm:text-base text-gray-600">Mô tả: {result.data.describe}</p>
                                     <Link
                                         to={`/profile/${result.data.idUserJoined}`}
                                         className="flex items-center mt-2"
                                     >
                                         <img
-                                            src={
-                                                result.data.userImg ||
-                                                DEFAULT_IMG
-                                            }
+                                            src={result.data.userImg || DEFAULT_IMG}
                                             alt="User Avatar"
-                                            className="w-12 h-12 rounded-full"
+                                            className="w-10 h-10 rounded-full object-cover"
+                                            loading="lazy"
                                         />
-                                        <p className="font-bold ml-2">{result.data.userName}</p>
+                                        <p className="font-semibold ml-2 text-sm sm:text-base">{result.data.userName}</p>
                                     </Link>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p>Không có video nào.</p>
+                        <p className="text-gray-500 text-sm sm:text-base">Không có video nào.</p>
                     )}
                 </div>
             )}

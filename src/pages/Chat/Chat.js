@@ -801,7 +801,7 @@ function Chat() {
                             />
                             <button
                                 onClick={() => document.getElementById('fileInput').click()}
-                                className="ml-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                                className="ml-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 mr-2"
                             >
                                 <FontAwesomeIcon icon={faPaperclip} />
                             </button>
