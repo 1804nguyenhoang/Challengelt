@@ -220,15 +220,48 @@ const Profile = () => {
             alert('Không tìm thấy thử thách để xóa.');
             return;
         }
-        const confirmDelete = window.confirm('Bạn có chắc chắn muốn xóa thử thách này không?');
+        const confirmDelete = window.confirm('Bạn có chắc chắn muốn xóa thử thách này và toàn bộ dữ liệu liên quan không?');
         if (!confirmDelete) return;
-
+    
         try {
+            // Lấy thông tin thử thách để kiểm tra file ảnh
+            const challenge = await databases.getDocument(DATABASE_ID, CHALLENGES_ID, challengeId);
+    
+            // Xóa file ảnh của thử thách nếu có
+            const deleteFilePromises = [];
+            if (challenge.fileImgId) {
+                deleteFilePromises.push(storage.deleteFile(BUCKET_ID, challenge.fileImgId));
+            }
+    
+            // Lấy danh sách các người tham gia thử thách
+            const joinedResponse = await databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [
+                Query.equal('challengeId', challengeId),
+            ]);
+    
+            // Xóa các file video và dữ liệu tham gia của người dùng
+            if (joinedResponse?.documents.length > 0) {
+                joinedResponse.documents.forEach((entry) => {
+                    if (entry.fileId) {
+                        deleteFilePromises.push(storage.deleteFile(BUCKET_ID, entry.fileId));
+                    }
+                    deleteFilePromises.push(
+                        databases.deleteDocument(DATABASE_ID, JOINED_CHALLENGES_ID, entry.$id)
+                    );
+                });
+            }
+    
+            // Thực hiện tất cả các thao tác xóa file và dữ liệu
+            await Promise.all(deleteFilePromises);
+    
+            // Xóa thử thách chính
             await databases.deleteDocument(DATABASE_ID, CHALLENGES_ID, challengeId);
+    
+            // Cập nhật danh sách thử thách đã tạo trong UI
             setCreatedChallenges((prevChallenges) =>
                 prevChallenges.filter((challenge) => challenge.$id !== challengeId),
             );
-            alert('Xóa thử thách thành công!');
+    
+            alert('Xóa thử thách và toàn bộ dữ liệu liên quan thành công!');
         } catch (error) {
             console.error('Lỗi khi xóa thử thách:', error.message);
             alert('Không thể xóa thử thách, vui lòng thử lại.');
@@ -714,7 +747,7 @@ const Profile = () => {
                                             >
                                                 <Link
                                                     to={`/challenge/${challenge.$id}`}
-                                                    className="flex items-center gap-4"
+                                                    className="flex items-center gap-4 w-full"
                                                 >
                                                     {challenge.imgChallenge && (
                                                         <img

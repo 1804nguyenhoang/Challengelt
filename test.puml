@@ -1,0 +1,82 @@
+@startuml
+skinparam monochrome true
+
+' Entities
+entity "User" as user {
+  * userId : String <<PK>>
+  --
+  email : String
+  password : String
+  displayName : String
+  avatar : String
+  score : Integer
+}
+
+entity "Challenge" as challenge {
+  * challengeId : String <<PK>>
+  --
+  title : String
+  description : String
+  creationDate : Date
+  modificationDate : Date
+  image : String
+  creatorId : String <<FK>>
+  creatorName : String
+  category : String
+  participantsCount : Integer
+}
+
+entity "Message" as message {
+  * messageId : String <<PK>>
+  --
+  senderId : String <<FK>>
+  receiverId : String <<FK>>
+  content : String
+  timestamp : Date
+}
+
+entity "Friendship" as friendship {
+  * friendshipId : String <<PK>>
+  --
+  userId1 : String <<FK>>
+  userId2 : String <<FK>>
+  status : String
+}
+
+entity "Video" as video {
+  * videoId : String <<PK>>
+  --
+  challengeId : String <<FK>>
+  userId : String <<FK>>
+  url : String
+  uploadDate : Date
+}
+
+entity "Comment" as comment {
+  * commentId : String <<PK>>
+  --
+  videoId : String <<FK>>
+  userId : String <<FK>>
+  content : String
+  timestamp : Date
+}
+
+entity "Admin" as admin {
+  * adminId : String <<PK>>
+  --
+  userId : String <<FK>>
+}
+
+' Relationships
+user ||--o{ challenge : creates
+user ||--o{ challenge : joins
+challenge ||--o{ video : has
+video ||--o{ comment : has
+user ||--o{ message : sends
+user ||--o{ message : receives
+user ||--o{ friendship : has
+admin ||--o{ user : manages
+admin ||--o{ challenge : manages
+admin ||--o{ video : manages
+
+@enduml

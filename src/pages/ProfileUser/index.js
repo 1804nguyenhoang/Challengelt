@@ -428,14 +428,6 @@ function ProfileUser() {
                                     className="flex flex-col bg-white p-4 rounded-lg shadow hover:bg-gray-50 transition-colors"
                                 >
                                     <div>
-                                        {challenge.imgChallenge && (
-                                            <img
-                                                src={challenge.imgChallenge}
-                                                alt={challenge.nameChallenge}
-                                                className="w-full h-48 object-cover rounded-lg mb-2"
-                                                loading="lazy"
-                                            />
-                                        )}
                                         <p className="font-bold text-sm sm:text-lg">{challenge.nameChallenge}</p>
                                         <p className="text-sm text-gray-500">{challenge.field}</p>
                                         <p className="text-sm text-blue-500">{challenge.participants} người tham gia</p>
