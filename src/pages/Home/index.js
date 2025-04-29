@@ -30,22 +30,30 @@ function Home() {
             const response = await databases.listDocuments(DATABASE_ID, CHALLENGES_ID, [
                 Query.limit(limit),
                 Query.offset(offset),
+                Query.orderDesc('participants'), // Sort by participants (descending)
             ]);
 
             const challengeIds = response.documents.map((challenge) => challenge.$id);
             const ratingsPromises = challengeIds.map((id) =>
-                databases.listDocuments(DATABASE_ID, RATINGS_ID, [
-                    Query.equal('challengeId', id),
-                ])
+                databases.listDocuments(DATABASE_ID, RATINGS_ID, [Query.equal('challengeId', id)]),
             );
 
             const ratingsResponses = await Promise.all(ratingsPromises);
-            const enrichedChallenges = response.documents.map((challenge, index) => {
+            let enrichedChallenges = response.documents.map((challenge, index) => {
                 const ratings = ratingsResponses[index].documents;
-                const averageRating = ratings.length > 0
-                    ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1)
-                    : 0;
-                return { ...challenge, averageRating };
+                const averageRating =
+                    ratings.length > 0
+                        ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1)
+                        : 0;
+                return { ...challenge, averageRating: parseFloat(averageRating) };
+            });
+
+            // Sort by averageRating as a secondary criterion (in-memory)
+            enrichedChallenges = enrichedChallenges.sort((a, b) => {
+                if (a.participants === b.participants) {
+                    return b.averageRating - a.averageRating; // Sort by averageRating descending
+                }
+                return b.participants - a.participants; // Primary sort by participants descending
             });
 
             setChallenges(enrichedChallenges);
@@ -70,13 +78,16 @@ function Home() {
         fetchChallenges(currentPage);
     }, [currentPage, fetchChallenges]);
 
-    const handlePageChange = useCallback((page) => {
-        if (page >= 1 && page <= totalPages && page !== currentPage) {
-            setLoading(true);
-            setCurrentPage(page);
-            navigate(`/home?page=${page}`);
-        }
-    }, [currentPage, totalPages, navigate]);
+    const handlePageChange = useCallback(
+        (page) => {
+            if (page >= 1 && page <= totalPages && page !== currentPage) {
+                setLoading(true);
+                setCurrentPage(page);
+                navigate(`/home?page=${page}`);
+            }
+        },
+        [currentPage, totalPages, navigate],
+    );
 
     const StarDisplay = useCallback(({ rating }) => {
         const stars = [1, 2, 3, 4, 5];
@@ -128,13 +139,16 @@ function Home() {
                                           {challenge.nameChallenge || `Thử thách ${challenge.$id}`}
                                       </h3>
                                       <p className={cx('challenge-info', 'mb-[3px] text-gray-500')}>
-                                          <FontAwesomeIcon icon={faFlag} /> Lĩnh vực: {challenge.field || 'Chưa xác định'}
+                                          <FontAwesomeIcon icon={faFlag} /> Lĩnh vực:{' '}
+                                          {challenge.field || 'Chưa xác định'}
                                       </p>
                                       <p className={cx('challenge-info', 'mb-[3px] text-gray-500')}>
-                                          <FontAwesomeIcon icon={faUsers} /> Số người tham gia: {challenge.participants || 0}
+                                          <FontAwesomeIcon icon={faUsers} /> Số người tham gia:{' '}
+                                          {challenge.participants || 0}
                                       </p>
                                       <p className={cx('challenge-info', 'mb-[3px] text-gray-500')}>
-                                          <FontAwesomeIcon icon={faPenNib} /> Tác giả: {challenge.createdBy || 'Không xác định'}
+                                          <FontAwesomeIcon icon={faPenNib} /> Tác giả:{' '}
+                                          {challenge.createdBy || 'Không xác định'}
                                       </p>
                                       <p className={cx('challenge-info', 'mb-[3px] text-gray-500')}>
                                           <StarDisplay rating={challenge.averageRating} />
@@ -147,14 +161,18 @@ function Home() {
 
             <div className={cx('mt-6 space-x-2', 'pagination')}>
                 <button
-                    className={`px-2 py-2 rounded-md bg-gray-200 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}
+                    className={`px-2 py-2 rounded-md bg-gray-200 ${
+                        currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'
+                    }`}
                     disabled={currentPage === 1}
                     onClick={() => handlePageChange(1)}
                 >
                     Đầu
                 </button>
                 <button
-                    className={`px-2 py-2 rounded-md bg-gray-200 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}
+                    className={`px-2 py-2 rounded-md bg-gray-200 ${
+                        currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'
+                    }`}
                     disabled={currentPage === 1}
                     onClick={() => handlePageChange(currentPage - 1)}
                 >
@@ -172,14 +190,18 @@ function Home() {
                     </button>
                 ))}
                 <button
-                    className={`px-2 py-2 rounded-md bg-gray-200 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}
+                    className={`px-2 py-2 rounded-md bg-gray-200 ${
+                        currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'
+                    }`}
                     disabled={currentPage === totalPages}
                     onClick={() => handlePageChange(currentPage + 1)}
                 >
                     Sau
                 </button>
                 <button
-                    className={`px-2 py-2 rounded-md bg-gray-200 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}`}
+                    className={`px-2 py-2 rounded-md bg-gray-200 ${
+                        currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'
+                    }`}
                     disabled={currentPage === totalPages}
                     onClick={() => handlePageChange(totalPages)}
                 >

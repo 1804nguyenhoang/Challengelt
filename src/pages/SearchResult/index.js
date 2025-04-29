@@ -1,23 +1,36 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CHALLENGES_ID, DATABASE_ID, databases, DEFAULT_IMG, JOINED_CHALLENGES_ID, Query, USERS_ID } from '~/appwrite/config';
+import {
+    CHALLENGES_ID,
+    DATABASE_ID,
+    databases,
+    DEFAULT_IMG,
+    JOINED_CHALLENGES_ID,
+    Query,
+    USERS_ID,
+} from '~/appwrite/config';
 import SearchItem from '~/components/SearchItem';
 import AccountItem from '~/components/AccountItem';
 import Skeleton from 'react-loading-skeleton';
 
 function SearchResult() {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('query');
+    const page = parseInt(searchParams.get('page'), 10) || 1;
     const [activeTab, setActiveTab] = useState('challenge');
     const [searchResults, setSearchResults] = useState([]);
+    const [currentPage, setCurrentPage] = useState(page);
+    const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
+    const limit = 6; // Number of results per page
 
     const fetchResults = useCallback(
-        async (type) => {
+        async (type, page) => {
             if (!query) return;
             setLoading(true);
 
             try {
+                const offset = (page - 1) * limit;
                 let response;
                 let formattedResults = [];
 
@@ -25,6 +38,8 @@ function SearchResult() {
                     case 'challenge':
                         response = await databases.listDocuments(DATABASE_ID, CHALLENGES_ID, [
                             Query.contains('nameChallenge', query),
+                            Query.limit(limit),
+                            Query.offset(offset),
                         ]);
                         formattedResults = response.documents.map((doc) => ({
                             id: `challenge-${doc.$id}`,
@@ -36,6 +51,8 @@ function SearchResult() {
                     case 'account':
                         response = await databases.listDocuments(DATABASE_ID, USERS_ID, [
                             Query.contains('displayName', query),
+                            Query.limit(limit),
+                            Query.offset(offset),
                         ]);
                         formattedResults = response.documents.map((doc) => ({
                             id: `account-${doc.$id}`,
@@ -47,6 +64,8 @@ function SearchResult() {
                     case 'video':
                         response = await databases.listDocuments(DATABASE_ID, JOINED_CHALLENGES_ID, [
                             Query.contains('describe', query),
+                            Query.limit(limit),
+                            Query.offset(offset),
                         ]);
 
                         const challengeMap = new Map();
@@ -94,57 +113,70 @@ function SearchResult() {
                 }
 
                 setSearchResults(formattedResults);
+                setTotalPages(Math.ceil(response.total / limit));
             } catch (error) {
                 console.error('Lỗi khi tìm kiếm:', error);
             } finally {
                 setLoading(false);
             }
         },
-        [query],
+        [query, limit],
     );
 
     useEffect(() => {
         if (query) {
-            fetchResults('challenge');
+            setCurrentPage(page);
+            fetchResults(activeTab, page);
         }
-    }, [query, fetchResults]);
+    }, [query, page, activeTab, fetchResults]);
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setCurrentPage(1); // Reset to page 1 when changing tabs
+        setSearchParams({ query, page: '1' });
+        fetchResults(tab, 1);
+    };
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+            setCurrentPage(newPage);
+            setSearchParams({ query, page: newPage.toString() });
+        }
+    };
 
     return (
-        <div className="container mx-auto mt-8 mb-16 p-4 sm:p-6 bg-white rounded-lg shadow">
+        <div className="container mx-auto mt-8 mb-32 p-4 sm:p-6 bg-white rounded-lg shadow">
             <h1 className="text-2xl sm:text-3xl font-bold mb-6">Kết quả tìm kiếm cho: "{query}"</h1>
 
             {/* Menu Điều Hướng */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
                 <button
-                    className={`px-4 py-2 rounded font-semibold text-sm sm:text-base ${
-                        activeTab === 'challenge' ? 'bg-[#f86666] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    className={`px-4 py-2 rounded font-semibold text-2xl sm:text-2xl ${
+                        activeTab === 'challenge'
+                            ? 'bg-[#f86666] text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
-                    onClick={() => {
-                        setActiveTab('challenge');
-                        fetchResults('challenge');
-                    }}
+                    onClick={() => handleTabChange('challenge')}
                 >
                     Thử thách
                 </button>
                 <button
-                    className={`px-4 py-2 rounded font-semibold text-sm sm:text-base ${
-                        activeTab === 'account' ? 'bg-[#f86666] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    className={`px-4 py-2 rounded font-semibold text-2xl sm:text-2xl ${
+                        activeTab === 'account'
+                            ? 'bg-[#f86666] text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
-                    onClick={() => {
-                        setActiveTab('account');
-                        fetchResults('account');
-                    }}
+                    onClick={() => handleTabChange('account')}
                 >
                     Người dùng
                 </button>
                 <button
-                    className={`px-4 py-2 rounded font-semibold text-sm sm:text-base ${
-                        activeTab === 'video' ? 'bg-[#f86666] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    className={`px-4 py-2 rounded font-semibold text-2xl sm:text-2xl ${
+                        activeTab === 'video'
+                            ? 'bg-[#f86666] text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
-                    onClick={() => {
-                        setActiveTab('video');
-                        fetchResults('video');
-                    }}
+                    onClick={() => handleTabChange('video')}
                 >
                     Video
                 </button>
@@ -207,7 +239,7 @@ function SearchResult() {
                             {searchResults.map((result) => (
                                 <div key={result.id} className="p-4 bg-gray-100 rounded-lg shadow">
                                     <Link to={`/challenge/${result.data.challengeId}`}>
-                                        <p className="text-blue-600 font-semibold mb-2 text-sm sm:text-base">
+                                        <p className="text-blue-600 font-semibold mb-2 text-2xl sm:text-2xl">
                                             {result.data.challengeName || 'Không có dữ liệu'}
                                         </p>
                                     </Link>
@@ -217,7 +249,9 @@ function SearchResult() {
                                         className="w-full h-40 sm:h-48 rounded-lg object-cover"
                                         loading="lazy"
                                     />
-                                    <p className="mt-2 text-sm sm:text-base text-gray-600">Mô tả: {result.data.describe}</p>
+                                    <p className="mt-2 text-sm sm:text-base text-gray-600">
+                                        Mô tả: {result.data.describe}
+                                    </p>
                                     <Link
                                         to={`/profile/${result.data.idUserJoined}`}
                                         className="flex items-center mt-2"
@@ -228,7 +262,9 @@ function SearchResult() {
                                             className="w-10 h-10 rounded-full object-cover"
                                             loading="lazy"
                                         />
-                                        <p className="font-semibold ml-2 text-sm sm:text-base">{result.data.userName}</p>
+                                        <p className="font-semibold mt-2 ml-2 text-xl sm:text-xl">
+                                            {result.data.userName}
+                                        </p>
                                     </Link>
                                 </div>
                             ))}
@@ -236,6 +272,67 @@ function SearchResult() {
                     ) : (
                         <p className="text-gray-500 text-sm sm:text-base">Không có video nào.</p>
                     )}
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="mt-6 flex justify-center space-x-2">
+                    <button
+                        className={`px-3 py-2 rounded-md ${
+                            currentPage === 1
+                                ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                        disabled={currentPage === 1}
+                        onClick={() => handlePageChange(1)}
+                    >
+                        Đầu
+                    </button>
+                    <button
+                        className={`px-3 py-2 rounded-md ${
+                            currentPage === 1
+                                ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                        disabled={currentPage === 1}
+                        onClick={() => handlePageChange(currentPage - 1)}
+                    >
+                        Trước
+                    </button>
+                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNum) => (
+                        <button
+                            key={pageNum}
+                            className={`px-3 py-2 rounded-md ${
+                                pageNum === currentPage ? 'bg-[#f86666] text-white' : 'bg-gray-200 hover:bg-gray-300'
+                            }`}
+                            onClick={() => handlePageChange(pageNum)}
+                        >
+                            {pageNum}
+                        </button>
+                    ))}
+                    <button
+                        className={`px-3 py-2 rounded-md ${
+                            currentPage === totalPages
+                                ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                        disabled={currentPage === totalPages}
+                        onClick={() => handlePageChange(currentPage + 1)}
+                    >
+                        Sau
+                    </button>
+                    <button
+                        className={`px-3 py-2 rounded-md ${
+                            currentPage === totalPages
+                                ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                        disabled={currentPage === totalPages}
+                        onClick={() => handlePageChange(totalPages)}
+                    >
+                        Cuối
+                    </button>
                 </div>
             )}
         </div>

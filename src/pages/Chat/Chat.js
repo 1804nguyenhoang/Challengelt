@@ -1,6 +1,19 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { databases, ID, Query, client, storage, DATABASE_ID, MESSAGES_ID, USERS_ID, BUCKET_ID, APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, DEFAULT_IMG } from '~/appwrite/config';
+import {
+    databases,
+    ID,
+    Query,
+    client,
+    storage,
+    DATABASE_ID,
+    MESSAGES_ID,
+    USERS_ID,
+    BUCKET_ID,
+    APPWRITE_ENDPOINT,
+    APPWRITE_PROJECT_ID,
+    DEFAULT_IMG,
+} from '~/appwrite/config';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faEdit,
@@ -214,7 +227,7 @@ function Chat() {
 
     // Tải thêm tin nhắn khi offset thay đổi
     useEffect(() => {
-        if (!userId || !selectedUser || offset === 0 || !hasMore ) return;
+        if (!userId || !selectedUser || offset === 0 || !hasMore) return;
 
         const fetchMoreMessages = async () => {
             if (abortControllerRef.current) {
@@ -476,7 +489,7 @@ function Chat() {
     const sendMessage = useCallback(async () => {
         if (!message.trim() || !selectedUser) return;
         setIsSendingMessage(true);
-    
+
         const newMessage = {
             senderId: userId,
             receiverId: selectedUser.$id,
@@ -486,7 +499,7 @@ function Chat() {
             isRead: false,
             replyTo: replyingTo ? replyingTo.$id : null,
         };
-    
+
         try {
             await databases.createDocument(DATABASE_ID, MESSAGES_ID, ID.unique(), newMessage);
             setMessage('');
@@ -595,10 +608,7 @@ function Chat() {
                             >
                                 <div className="flex items-center gap-2">
                                     <img
-                                        src={
-                                            user.imgUser ||
-                                            DEFAULT_IMG
-                                        }
+                                        src={user.imgUser || DEFAULT_IMG}
                                         alt={user.displayName}
                                         className="w-14 h-14 rounded-full"
                                     />
@@ -637,10 +647,7 @@ function Chat() {
                                 <FontAwesomeIcon icon={faArrowLeft} />
                             </button>
                             <img
-                                src={
-                                    selectedUser.imgUser ||
-                                    DEFAULT_IMG
-                                }
+                                src={selectedUser.imgUser || DEFAULT_IMG}
                                 alt={selectedUser.displayName}
                                 className="w-14 h-14 rounded-full mr-2"
                             />
@@ -721,14 +728,14 @@ function Chat() {
                                                         <img
                                                             src={msg.attachmentUrl}
                                                             alt={`File đính kèm từ ${msg.senderName}`}
-                                                            className="max-w-full mt-2 rounded"
+                                                            className="max-w-[200px] mt-2 rounded"
                                                         />
                                                     )}
                                                     {msg.attachmentType === 'video' && (
                                                         <video
                                                             src={msg.attachmentUrl}
                                                             controls
-                                                            className="max-w-full mt-2 rounded"
+                                                            className="max-w-[200px] mt-2 rounded"
                                                         />
                                                     )}
                                                     {msg.attachmentType === 'application' && (
