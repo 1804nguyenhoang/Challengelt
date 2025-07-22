@@ -1,82 +1,28 @@
 @startuml
-skinparam monochrome true
+actor User
+participant "Giao diện" as UI
+participant "Hệ thống" as System
+database "Cơ sở dữ liệu" as DB
 
-' Entities
-entity "User" as user {
-  * userId : String <<PK>>
-  --
-  email : String
-  password : String
-  displayName : String
-  avatar : String
-  score : Integer
-}
+== Chọn thử thách ==
+User -> UI : Chọn thử thách + bấm “Tham gia ngay”
+UI -> System : Yêu cầu mở trang tham gia
+System --> UI : Hiển thị giao diện tham gia
+UI --> User : Giao diện nhập video, mô tả
 
-entity "Challenge" as challenge {
-  * challengeId : String <<PK>>
-  --
-  title : String
-  description : String
-  creationDate : Date
-  modificationDate : Date
-  image : String
-  creatorId : String <<FK>>
-  creatorName : String
-  category : String
-  participantsCount : Integer
-}
+== Gửi tham gia ==
+User -> UI : Nhập video + mô tả
+User -> UI : Bấm “Tải”
+UI -> System : Gửi thông tin tham gia
+System -> System : Kiểm tra tính hợp lệ
 
-entity "Message" as message {
-  * messageId : String <<PK>>
-  --
-  senderId : String <<FK>>
-  receiverId : String <<FK>>
-  content : String
-  timestamp : Date
-}
-
-entity "Friendship" as friendship {
-  * friendshipId : String <<PK>>
-  --
-  userId1 : String <<FK>>
-  userId2 : String <<FK>>
-  status : String
-}
-
-entity "Video" as video {
-  * videoId : String <<PK>>
-  --
-  challengeId : String <<FK>>
-  userId : String <<FK>>
-  url : String
-  uploadDate : Date
-}
-
-entity "Comment" as comment {
-  * commentId : String <<PK>>
-  --
-  videoId : String <<FK>>
-  userId : String <<FK>>
-  content : String
-  timestamp : Date
-}
-
-entity "Admin" as admin {
-  * adminId : String <<PK>>
-  --
-  userId : String <<FK>>
-}
-
-' Relationships
-user ||--o{ challenge : creates
-user ||--o{ challenge : joins
-challenge ||--o{ video : has
-video ||--o{ comment : has
-user ||--o{ message : sends
-user ||--o{ message : receives
-user ||--o{ friendship : has
-admin ||--o{ user : manages
-admin ||--o{ challenge : manages
-admin ||--o{ video : manages
-
+alt Không hợp lệ
+    System --> UI : Thông báo lỗi
+    UI --> User : Hiển thị lỗi
+else Hợp lệ
+    System -> DB : Lưu thông tin tham gia
+    DB --> System : Xác nhận lưu
+    System --> UI : Thông báo thành công
+    UI --> User : Hiển thị "Tham gia thành công"
+end
 @enduml
