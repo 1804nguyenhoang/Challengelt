@@ -54,7 +54,6 @@ const Participant = React.memo(({ participant, userId, onLike, isLiking, onComme
             setTotalComments(commentsResponse.total);
         } catch (error) {
             console.error('Lỗi khi tải bình luận:', error);
-            alert('Vui lòng  thử lại.');
         } finally {
             setLoadingComments(false);
         }
